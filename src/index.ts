@@ -3,14 +3,16 @@ import axios from 'axios';
 import cheerio from 'cheerio';
 import striptags from 'striptags';
 import stopword from 'stopword';
+import srcset from 'srcset';
 import kirak32 from './tools/kirak32';
 import Jimp from 'jimp';
 import fs from 'fs';
-import { IgApiClient } from 'instagram-private-api';
+import { Feed, IgApiClient } from 'instagram-private-api';
 import _ from 'lodash';
 
 
 // Typescript:
+import { Font } from '@jimp/plugin-print';
 interface IArticle {
   headerImageURL: string;
   title: string;
@@ -25,9 +27,10 @@ interface IArticle {
 
 
 // Constants:
-import { OPINDIA_FEED, THEWIRE_EDITORS_PICK } from './constants/links';
+import { OPINDIA_FEED, SWARAJYA_FEED, THEWIRE_EDITORS_PICK } from './constants/links';
 import { IG_PASSWORD, IG_USERNAME } from './constants/credentials';
-import { OPINDIA, THEWIRE } from './constants/sources';
+import { OPINDIA, SWARAJYA, THEWIRE } from './constants/sources';
+const MINUTE = 60 * 1000, HOUR = 60 * MINUTE;
 
 
 // Functions:
@@ -76,6 +79,16 @@ const getHashtags = (article: string) => {
     .map(commonWord => `#${ commonWord.word }`).join(' ');
 };
 
+const getAllItemsFromFeed = async <T>(feed: Feed<any, T>): Promise<T[]> => {
+  let items: T[] = [];
+  do {
+    items = items.concat(await feed.items());
+    const time = Math.round(Math.random() * 4000) + 1000;
+    await sleep(time);
+  } while (feed.isMoreAvailable());
+  return items;
+};
+
 const fetchOpIndiaArticle = async (URL: string) => {
   const result = await axios.get(URL);
   const $ = cheerio.load(result.data);
@@ -91,7 +104,7 @@ const fetchOpIndiaArticle = async (URL: string) => {
   return article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
 };
 
-const fetchOpIndiaArticles = async ({ URL, articleCount }: { URL: string, articleCount: number }) => {
+const fetchOpIndiaArticles = async ({ URL, articleCount, declarative }: { URL: string, articleCount: number, declarative: boolean }) => {
   const articles: IArticle[] = [];
   const result = await axios.get(URL);
   const $ = cheerio.load(result.data);
@@ -117,7 +130,40 @@ const fetchOpIndiaArticles = async ({ URL, articleCount }: { URL: string, articl
       });
     }
   });
-  return articles;
+  declarative && console.log('✅ Fetched OpIndia\'s articles.');
+  articles.reverse();
+  let newPosts = false;
+  try {
+    const lastArticleID = fs.readFileSync('./opindia.mohini', { encoding: 'utf-8' }).toString();
+    const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+    if (lastArticleID === articles[ articles.length - 1 ].articleID) {
+      newPosts = false;
+    } else if (lastArticleIDIndex !== -1) {
+      newPosts = true;
+      fs.writeFileSync('./opindia.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+      articles.splice(0, lastArticleIDIndex + 1);
+    } else if (lastArticleIDIndex === -1) {
+      newPosts = true;
+      fs.writeFileSync('./opindia.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    }
+  } catch(e) {
+    newPosts = true;
+    if (e.code === 'ENOENT') {
+      fs.writeFileSync('./opindia.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    } else {
+      console.error(e);
+    }
+  }
+  if (newPosts) {
+    declarative && console.log('🔥 New articles to post from OpIndia!');
+    const
+      articleTexts = await Promise.all(articles.map(async (article) => await fetchOpIndiaArticle(article.articleLink))),
+      articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
+      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: OpIndia` });
+    return articles;
+  } else {
+    return [];
+  }
 };
 
 const fetchTheWireArticle = async (URL: string) => {
@@ -133,7 +179,7 @@ const fetchTheWireArticle = async (URL: string) => {
   return article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
 };
 
-const fetchTheWireArticles = async ({ URL, articleCount }: { URL: string, articleCount: number }) => {
+const fetchTheWireArticles = async ({ URL, articleCount, declarative }: { URL: string, articleCount: number, declarative: boolean }) => {
   const articles: IArticle[] = [];
   const result = await axios.get(URL);
   const $ = cheerio.load(result.data);
@@ -158,57 +204,272 @@ const fetchTheWireArticles = async ({ URL, articleCount }: { URL: string, articl
       });
     }
   });
-  return articles;
+  declarative && console.log('✅ Fetched The Wire\'s articles.');
+  articles.reverse();
+  let newPosts = false;
+  try {
+    const lastArticleID = fs.readFileSync('./thewire.mohini', { encoding: 'utf-8' }).toString();
+    const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+    if (lastArticleID === articles[ articles.length - 1 ].articleID) {
+      newPosts = false;
+    } else if (lastArticleIDIndex !== -1) {
+      newPosts = true;
+      fs.writeFileSync('./thewire.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+      articles.splice(0, lastArticleIDIndex + 1);
+    } else if (lastArticleIDIndex === -1) {
+      newPosts = true;
+      fs.writeFileSync('./thewire.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    }
+  } catch(e) {
+    newPosts = true;
+    if (e.code === 'ENOENT') {
+      fs.writeFileSync('./thewire.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    } else {
+      console.error(e);
+    }
+  }
+  if (newPosts) {
+    declarative && console.log('🔥 New articles to post from The Wire!');
+    const
+      articleTexts = await Promise.all(articles.map(async (article) => await fetchTheWireArticle(article.articleLink))),
+      articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
+      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: The Wire` });
+    return articles;
+  } else {
+    return [];
+  }
+};
+
+const fetchSwarajyaArticle = async (URL: string) => {
+  const result = await axios.get(URL);
+  const $ = cheerio.load(result.data);
+  let article = '';
+  $('.story-element.story-element-text:not(.story-element-text-summary) > div > p').each((_i, element) => {
+    const paragraph = $(element).text();
+    if (paragraph !== null) {
+      article = article.concat(`\n${ striptags(paragraph) }`);
+    }
+  });
+  return {
+    headerImageURL: `https:${ _.maxBy(srcset.parse($('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset') ?? ''), o => o.width)?.url }`,
+    caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+  };
+};
+
+const fetchSwarajyaArticles = async ({ URL, articleCount, declarative }: { URL: string, articleCount: number, declarative: boolean }) => {
+  const articles: IArticle[] = [];
+  const result = await axios.get(URL);
+  const $ = cheerio.load(result.data);
+  $('.latest-m__load-more-lt-container__XnqhO > div').each((i, element) => {
+    if (i < articleCount) {
+      const headerImageURL = '';
+      const title = $(element).find('.latest-m__card__3vkwo > .latest-m__card-content__3MfaP > .latest-m__card-headline__7-HCL').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`) ?? '';
+      const category = '';
+      const articleLink = URL + ($(element).find('.latest-m__card__3vkwo > a').attr('href') ?? '');
+      const articleID = articleLink ? kirak32(articleLink) : '0';
+      const author = $(element).find('.latest-m__card__3vkwo > .latest-m__card-content__3MfaP > .latest-m__card-author__2sAya').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`) ?? '';
+      articles.push({
+        headerImageURL,
+        title,
+        category,
+        articleLink,
+        articleID,
+        author: author === 'Swarajya Staff' ? 'External Sources' : author,
+        excerpt: '',
+        source: SWARAJYA,
+        caption: ''
+      });
+    }
+  });
+  declarative && console.log('✅ Fetched Swarajya\'s articles.');
+  articles.reverse();
+  let newPosts = false;
+  try {
+    const lastArticleID = fs.readFileSync('./swarajya.mohini', { encoding: 'utf-8' }).toString();
+    const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+    if (lastArticleID === articles[ articles.length - 1 ].articleID) {
+      newPosts = false;
+    } else if (lastArticleIDIndex !== -1) {
+      newPosts = true;
+      fs.writeFileSync('./swarajya.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+      articles.splice(0, lastArticleIDIndex + 1);
+    } else if (lastArticleIDIndex === -1) {
+      newPosts = true;
+      fs.writeFileSync('./swarajya.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    }
+  } catch(e) {
+    newPosts = true;
+    if (e.code === 'ENOENT') {
+      fs.writeFileSync('./swarajya.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    } else {
+      console.error(e);
+    }
+  }
+  if (newPosts) {
+    declarative && console.log('🔥 New articles to post from Swarajya!');
+    const
+      articleTextsAndHeaderImageURLs = await Promise.all(articles.map(async (article) => await fetchSwarajyaArticle(article.articleLink))),
+      articleHashtags = articleTextsAndHeaderImageURLs.map(articleTextsAndHeaderImageURL => getHashtags(articleTextsAndHeaderImageURL.caption));
+      articles.forEach((article, i, array) => array[i] = { ...article, headerImageURL: articleTextsAndHeaderImageURLs[i].headerImageURL, caption: `${ _.truncate(articleTextsAndHeaderImageURLs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: Swarajya Magazine` });
+    return articles;
+  } else {
+    return [];
+  }
 };
 
 const createPost = async (headerImageURL: string, title: string, excerpt: string, index: number) => {
   const image = new Jimp(1000, 1000, '#FFFFFF');
   const headerImage = (await Jimp.read(headerImageURL)).cover(1000, 500);
   const logo = (await Jimp.read('./assets/logo/thewiredwatermark.jpg')).resize(125, 50);
-  const titleFont = await Jimp.loadFont('./assets/fonts/josefin-sans-48-black-bold/josefin-sans-48-black-bold.fnt');
-  const excerptFont = await Jimp.loadFont('./assets/fonts/josefin-sans-40-black-light/josefin-sans-40-black-light.fnt');
   let computedHeight = 0;
+  const randomIndex = Math.floor(Math.random() * 3);
+  if (randomIndex === 0) {
+    const titleFont = await Jimp.loadFont('./assets/fonts/josefin-sans-48-black-bold/josefin-sans-48-black-bold.fnt');
+    const excerptFont = await Jimp.loadFont('./assets/fonts/josefin-sans-40-black-light/josefin-sans-40-black-light.fnt');
 
-  // Add header image.
-  image.composite(headerImage, 0, 0, {
-    mode: Jimp.BLEND_SOURCE_OVER,
-    opacityDest: 1,
-    opacitySource: 1
-  });
-  computedHeight = computedHeight + headerImage.getHeight();
+    // Add header image.
+    image.composite(headerImage, 0, 0, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
+    computedHeight = computedHeight + headerImage.getHeight();
 
-  // Draw left border.
-  image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
-    this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
-  });
+    // Draw left border.
+    image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
+      this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+    });
 
-  // Add logo.
-  image.composite(logo, 10, 0, {
-    mode: Jimp.BLEND_SOURCE_OVER,
-    opacityDest: 1,
-    opacitySource: 1
-  });
+    // Add logo.
+    image.composite(logo, 10, 0, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
 
-  // Print title.
-  const titleHeight = Jimp.measureTextHeight(titleFont, title, 1000 - 50 - 50);
-  image.print(titleFont, 50, headerImage.getHeight() + 30, title, 1000 - 50 - 50, titleHeight);
-  computedHeight = computedHeight + titleHeight + 30;
+    // Print title.
+    const titleHeight = Jimp.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+    image.print(titleFont, 50, headerImage.getHeight() + 30, title, 1000 - 50 - 50, titleHeight);
+    computedHeight = computedHeight + titleHeight + 30;
 
-  // Draw middle border.
-  image.scan(0, computedHeight + 20, 1000, 10, function (_x, _y, offset) {
-    this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
-  });
-  computedHeight = computedHeight + 20 + 10;
-  
-  // Print excerpt.
-  image.print(excerptFont, 50, computedHeight, {
-    text: excerpt,
-    alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
-    alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-  }, 1000 - 50 - 50, 1000 - computedHeight);
+    // Draw middle border.
+    image.scan(0, computedHeight + 20, 1000, 10, function (_x, _y, offset) {
+      this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+    });
+    computedHeight = computedHeight + 20 + 10;
+    
+    // Print excerpt.
+    image.print(excerptFont, 50, computedHeight, {
+      text: excerpt,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 1000 - 50 - 50, 1000 - computedHeight);
+  } else if (randomIndex === 1) {
+    const smallTitleFont = await Jimp.loadFont('./assets/fonts/roboto-48-black-bold/roboto-48-black-bold.fnt');
+    const largeTitleFont = await Jimp.loadFont('./assets/fonts/roboto-64-black-bold/roboto-64-black-bold.fnt');
+    const excerptFont = await Jimp.loadFont('./assets/fonts/roboto-32-black-regular/roboto-32-black-regular.fnt');
+    let titleFont: Font = smallTitleFont;
+    
+    // Add header image.
+    image.composite(headerImage, 0, 0, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
+    computedHeight = computedHeight + headerImage.getHeight();
 
+    // Add logo.
+    image.composite(logo, 0, 0, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
+
+    // Calculate theoretical height with small title.
+    const totalHeight = 500 + (30 + Jimp.measureTextHeight(smallTitleFont, title, 1000 - 50 - 50)) + (30 + 10) + (50 + Jimp.measureTextHeight(excerptFont, excerpt, 1000 - 50 - 50) + 50);
+    if (totalHeight <= 900) {
+      // Use large title.
+      titleFont = largeTitleFont;
+    } else {
+      // Use small title.
+      titleFont = smallTitleFont;
+    }
+
+    // Print title.
+    const titleHeight = Jimp.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+    image.print(titleFont, 50, headerImage.getHeight() + 30, {
+      text: title,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 1000 - 50 - 50, titleHeight);
+    computedHeight = computedHeight + titleHeight + 30;
+
+    // Draw middle border.
+    image.scan(50, computedHeight + 30, 900, 10, function (_x, _y, offset) {
+      this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+    });
+    computedHeight = computedHeight + 30 + 10;
+
+    // Print excerpt.
+    image.print(excerptFont, 50, computedHeight, {
+      text: excerpt,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 1000 - 50 - 50, 1000 - computedHeight);
+    computedHeight = 1000;
+  } else if (randomIndex === 2) {
+    const smallTitleFont = await Jimp.loadFont('./assets/fonts/roboto-48-black-bold/roboto-48-black-bold.fnt');
+    const largeTitleFont = await Jimp.loadFont('./assets/fonts/roboto-64-black-bold/roboto-64-black-bold.fnt');
+    const excerptFont = await Jimp.loadFont('./assets/fonts/roboto-32-black-regular/roboto-32-black-regular.fnt');
+    let titleFont: Font = smallTitleFont;
+
+    // Add header image.
+    image.composite(headerImage, 0, 500, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
+
+    // Draw left border.
+    image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
+      this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+    });
+
+    // Add logo.
+    image.composite(logo, 875, 0, {
+      mode: Jimp.BLEND_SOURCE_OVER,
+      opacityDest: 1,
+      opacitySource: 1
+    });
+
+    // Calculate theoretical height with small title.
+    const totalHeight = (75 + Jimp.measureTextHeight(smallTitleFont, title, 1000 - 50 - 50)) + (25 + Jimp.measureTextHeight(excerptFont, excerpt, 1000 - 50 - 50) + 50);
+    if (totalHeight <= 420) {
+      // Use large title.
+      titleFont = largeTitleFont;
+    } else {
+      // Use small title.
+      titleFont = smallTitleFont;
+    }
+
+    // Print title.
+    const titleHeight = Jimp.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+    image.print(titleFont, 50, 75, {
+      text: title,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 1000 - 50 - 50, titleHeight);
+    computedHeight = computedHeight + titleHeight + 75;
+
+    // Print excerpt.
+    image.print(excerptFont, 50, computedHeight + 25, {
+      text: excerpt,
+      alignmentX: Jimp.HORIZONTAL_ALIGN_LEFT,
+      alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
+    }, 1000 - 50 - 50, 500 - computedHeight - 25 - 50);
+  }
   image.write(`./assets/output/posts/${ index }.jpg`);
-  // return await image.getBase64Async(Jimp.MIME_JPEG);
+  return;
 };
 
 const createStory = async (headerImageURL: string, title: string, index: number) => {
@@ -285,101 +546,47 @@ const createStory = async (headerImageURL: string, title: string, index: number)
   }
 
   image.write(`./assets/output/story/${ index }.jpg`);
-  // return await image.getBase64Async(Jimp.MIME_JPEG);
 };
 
-const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
+const checkAndPublish = async (ig: IgApiClient | any, declarative: boolean) => {
   const
-    opIndiaArticles = (await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 5 })).reverse(),
-    theWireArticles = (await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 5 })).reverse();
-  declarative && console.log('✅ Fetched OpIndia and TheWire articles.');
-  let lastOpIndiaArticleID = '', lastTheWireArticleID = '', newOpIndiaPosts = false, newTheWirePosts = false, articles: IArticle[] = [];
-  try {
-    lastOpIndiaArticleID = fs.readFileSync('./opindia.mohini', { encoding: 'utf-8' }).toString();
-    const lastOpIndiaArticleIDIndex = opIndiaArticles.findIndex(opIndiaArticle => opIndiaArticle.articleID === lastOpIndiaArticleID);
-    if (lastOpIndiaArticleID === opIndiaArticles[ opIndiaArticles.length - 1 ].articleID) {
-      newOpIndiaPosts = false;
-      opIndiaArticles.splice(0, 5);
-    } else if (lastOpIndiaArticleIDIndex !== -1) {
-      newOpIndiaPosts = true;
-      fs.writeFileSync('./opindia.mohini', opIndiaArticles[ opIndiaArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-      opIndiaArticles.splice(0, lastOpIndiaArticleIDIndex + 1);
-    } else if (lastOpIndiaArticleIDIndex === -1) {
-      newOpIndiaPosts = true;
-      fs.writeFileSync('./opindia.mohini', opIndiaArticles[ opIndiaArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-    }
-  } catch(e) {
-    newOpIndiaPosts = true;
-    if (e.code === 'ENOENT') {
-      fs.writeFileSync('./opindia.mohini', opIndiaArticles[ opIndiaArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-    } else {
-      console.error(e);
-    }
-  }
-  try {
-    lastTheWireArticleID = fs.readFileSync('./thewire.mohini', { encoding: 'utf-8' }).toString();
-    const lastTheWireArticleIDIndex = theWireArticles.findIndex(theWireArticle => theWireArticle.articleID === lastTheWireArticleID);
-    if (lastTheWireArticleID === theWireArticles[ theWireArticles.length - 1 ].articleID) {
-      newTheWirePosts = false;
-      theWireArticles.splice(0, 5);
-    } else if (lastTheWireArticleIDIndex !== -1) {
-      newTheWirePosts = true;
-      fs.writeFileSync('./thewire.mohini', theWireArticles[ theWireArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-      theWireArticles.splice(0, lastTheWireArticleIDIndex + 1);
-    } else if (lastTheWireArticleIDIndex === -1) {
-      newTheWirePosts = true;
-      fs.writeFileSync('./thewire.mohini', theWireArticles[ theWireArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-    }
-  } catch(e) {
-    newTheWirePosts = true;
-    if (e.code === 'ENOENT') {
-      fs.writeFileSync('./thewire.mohini', theWireArticles[ theWireArticles.length - 1 ].articleID, { encoding: 'utf-8' });
-    } else {
-      console.error(e);
-    }
-  }
-  if (!newOpIndiaPosts && !newTheWirePosts) {
-    declarative && console.log('❄️ No new articles to post!');
+    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 5, declarative }),
+    theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 5, declarative }),
+    swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 5, declarative });
+  const articles: IArticle[] = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
+  if (articles.length === 0) {
+    declarative && console.log('🥶 No new articles to post!');
     return;
-  } else if (newOpIndiaPosts) {
-    declarative && console.log('🔥 New articles to post from OpIndia!');
-  } else if (newTheWirePosts) {
-    declarative && console.log('🔥 New articles to post from The Wire!');
   }
-  const
-    opIndiaArticleTexts = await Promise.all(opIndiaArticles.map(async (opIndiaArticle) => await fetchOpIndiaArticle(opIndiaArticle.articleLink))),
-    theWireArticleTexts = await Promise.all(theWireArticles.map(async (theWireArticle) => await fetchTheWireArticle(theWireArticle.articleLink))),
-    opIndiaArticleHashtags = opIndiaArticleTexts.map(opIndiaArticleText => getHashtags(opIndiaArticleText)),
-    theWireArticleHashtags = theWireArticleTexts.map(theWireArticleText => getHashtags(theWireArticleText));
-  opIndiaArticles.forEach((opIndiaArticle, i, array) => array[i] = { ...opIndiaArticle, caption: `${ _.truncate(opIndiaArticleTexts[i], { length: 2000 - opIndiaArticleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ opIndiaArticleHashtags[i] }` });
-  theWireArticles.forEach((theWireArticle, i, array) => array[i] = { ...theWireArticle, caption: `${ _.truncate(theWireArticleTexts[i], { length: 2000 - theWireArticleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ theWireArticleHashtags[i] }` });
-  articles = articles.concat(opIndiaArticles).concat(theWireArticles);
-  articles = knuthShuffle(articles);
   for (const [ i, article ] of articles.entries()) {
     if (article.source === THEWIRE) {
       const result = await axios.get(article.articleLink);
       const $ = cheerio.load(result.data);
       article.excerpt = $('.shortDesc').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+    } else if (article.source === SWARAJYA) {
+      const result = await axios.get(article.articleLink);
+      const $ = cheerio.load(result.data);
+      article.excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
     }
     declarative && console.log(`🌺 Posting ${ article.articleID } as a photo...`);
-    await createPost(article.headerImageURL, article.title, article.excerpt, i);
-    await sleep(5 * 1000);
+    await createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
+    await sleep(Math.round(Math.random() * 4000) + 1000);
     await ig.publish.photo({
       file: fs.readFileSync(`./assets/output/posts/${ i }.jpg`),
       caption: article.caption
     });
     declarative && console.log('✅ Posted!');
-    declarative && console.log('⌚ Waiting 30 seconds to avoid ban...');
-    await sleep(30 * 1000);
+    declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
+    await sleep(Math.round(Math.random() * 15000) + 15000);
     declarative && console.log(`🌺 Posting ${ article.articleID } as a story...`);
-    await createStory(article.headerImageURL, article.title, i);
-    await sleep(5 * 1000);
+    await createStory(article.headerImageURL, article.title.trim(), i);
+    await sleep(Math.round(Math.random() * 4000) + 1000);
     await ig.publish.story({
       file: fs.readFileSync(`./assets/output/story/${ i }.jpg`)
     });
-    declarative && console.log('⌚ Waiting 30 seconds to avoid ban...');
-    await sleep(30 * 1000);
     declarative && console.log('✅ Posted!');
+    declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
+    await sleep(Math.round(Math.random() * 15000) + 15000);
   }
   declarative && console.log('✅ All articles were posted!');
 };
@@ -390,7 +597,9 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
   ig.state.generateDevice(IG_USERNAME);
   declarative && console.log('✅ Generated new device.');
   declarative && console.log('🌺 Logging in...');
+  await ig.simulate.preLoginFlow();
   await ig.account.login(IG_USERNAME, IG_PASSWORD);
+  process.nextTick(async () => await ig.simulate.postLoginFlow());
   declarative && console.log('✅ Logged in to account.');
 
   // First run.
@@ -402,7 +611,61 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
     declarative && console.log('🌺 Checking for new articles...');
     await checkAndPublish(ig, declarative);
     declarative && console.log('⌚ Checking in after 30 minutes!');
-  }, 30 * 60 * 1000);
+  }, 30 * MINUTE);
+
+  // Follow new users (2 of n).
+  setInterval(async () => {
+    declarative && console.log('🌺 Following 50 users...');
+    const
+      followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId),
+      followers = await getAllItemsFromFeed(followersFeed),
+      followCount = followers.length,
+      targetIndexes = [];
+    while (targetIndexes.length < 25) {
+      const r = Math.floor(Math.random() * followCount);
+      if (targetIndexes.indexOf(r) === -1) targetIndexes.push(r);
+    }
+    for (const targetIndex of targetIndexes) {
+      const
+        followerFollowersFeed = ig.feed.accountFollowers(followers[ targetIndex ].pk),
+        followerFollowers = await followerFollowersFeed.items(),
+        subTargetIndexes = [];
+      while (subTargetIndexes.length < 2) {
+        const r = Math.floor(Math.random() * followCount);
+        if (subTargetIndexes.indexOf(r) === -1) subTargetIndexes.push(r);
+      }
+      for (const subTargetIndex of subTargetIndexes) {
+        ig.friendship.create(followerFollowers[ subTargetIndex ].pk);
+        const time = Math.round(Math.random() * 1000) + 1000;
+        await sleep(time);
+      }
+      const time = Math.round(Math.random() * 9000) + 1000;
+      await sleep(time);
+    }
+    declarative && console.log('✅ 50 users followed!');
+  }, 3.3 * HOUR);
+
+  // Unfollow users.
+  setInterval(async () => {
+    declarative && console.log('🌺 Unfollowing 50 users...');
+    const
+      followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId),
+      followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId),
+      followers = await getAllItemsFromFeed(followersFeed),
+      following = await getAllItemsFromFeed(followingFeed),
+      followersUsername = new Set(followers.map(({ username }) => username)),
+      notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
+    for (const [ i, user ] of notFollowingYou.entries()) {
+      if (i <= 49) {
+        await ig.friendship.destroy(user.pk);
+        const time = Math.round(Math.random() * 9000) + 1000;
+        await sleep(time);
+      } else {
+        break;
+      }
+    }
+    declarative && console.log('✅ 50 users unfollowed!');
+  }, 4 * HOUR);
 };
 
 engine({ declarative: true });

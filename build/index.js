@@ -17,6 +17,7 @@ const axios_1 = __importDefault(require("axios"));
 const cheerio_1 = __importDefault(require("cheerio"));
 const striptags_1 = __importDefault(require("striptags"));
 const stopword_1 = __importDefault(require("stopword"));
+const srcset_1 = __importDefault(require("srcset"));
 const kirak32_1 = __importDefault(require("./tools/kirak32"));
 const jimp_1 = __importDefault(require("jimp"));
 const fs_1 = __importDefault(require("fs"));
@@ -27,6 +28,7 @@ const lodash_1 = __importDefault(require("lodash"));
 const links_1 = require("./constants/links");
 const credentials_1 = require("./constants/credentials");
 const sources_1 = require("./constants/sources");
+const MINUTE = 60 * 1000, HOUR = 60 * MINUTE;
 // Functions:
 const knuthShuffle = (array) => {
     let currentIndex = array.length, randomIndex;
@@ -70,6 +72,15 @@ const getHashtags = (article) => {
         .filter(commonWord => RegExp(/^#?[^\s!@#$%^&*()=+./,\[{\]};:'"?><]+$/g).test(commonWord.word))
         .map(commonWord => `#${commonWord.word}`).join(' ');
 };
+const getAllItemsFromFeed = (feed) => __awaiter(void 0, void 0, void 0, function* () {
+    let items = [];
+    do {
+        items = items.concat(yield feed.items());
+        const time = Math.round(Math.random() * 4000) + 1000;
+        yield sleep(time);
+    } while (feed.isMoreAvailable());
+    return items;
+});
 const fetchOpIndiaArticle = (URL) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield axios_1.default.get(URL);
     const $ = cheerio_1.default.load(result.data);
@@ -84,7 +95,7 @@ const fetchOpIndiaArticle = (URL) => __awaiter(void 0, void 0, void 0, function*
     });
     return article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
 });
-const fetchOpIndiaArticles = ({ URL, articleCount }) => __awaiter(void 0, void 0, void 0, function* () {
+const fetchOpIndiaArticles = ({ URL, articleCount, declarative }) => __awaiter(void 0, void 0, void 0, function* () {
     const articles = [];
     const result = yield axios_1.default.get(URL);
     const $ = cheerio_1.default.load(result.data);
@@ -111,7 +122,43 @@ const fetchOpIndiaArticles = ({ URL, articleCount }) => __awaiter(void 0, void 0
             });
         }
     });
-    return articles;
+    declarative && console.log('✅ Fetched OpIndia\'s articles.');
+    articles.reverse();
+    let newPosts = false;
+    try {
+        const lastArticleID = fs_1.default.readFileSync('./opindia.mohini', { encoding: 'utf-8' }).toString();
+        const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+        if (lastArticleID === articles[articles.length - 1].articleID) {
+            newPosts = false;
+        }
+        else if (lastArticleIDIndex !== -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./opindia.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+            articles.splice(0, lastArticleIDIndex + 1);
+        }
+        else if (lastArticleIDIndex === -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./opindia.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+    }
+    catch (e) {
+        newPosts = true;
+        if (e.code === 'ENOENT') {
+            fs_1.default.writeFileSync('./opindia.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+        else {
+            console.error(e);
+        }
+    }
+    if (newPosts) {
+        declarative && console.log('🔥 New articles to post from OpIndia!');
+        const articleTexts = yield Promise.all(articles.map((article) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchOpIndiaArticle(article.articleLink); }))), articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
+        articles.forEach((article, i, array) => array[i] = Object.assign(Object.assign({}, article), { caption: `${lodash_1.default.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n')}\n⠀\n${articleHashtags[i]}\n⠀\nSource: OpIndia` }));
+        return articles;
+    }
+    else {
+        return [];
+    }
 });
 const fetchTheWireArticle = (URL) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield axios_1.default.get(URL);
@@ -125,7 +172,7 @@ const fetchTheWireArticle = (URL) => __awaiter(void 0, void 0, void 0, function*
     });
     return article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
 });
-const fetchTheWireArticles = ({ URL, articleCount }) => __awaiter(void 0, void 0, void 0, function* () {
+const fetchTheWireArticles = ({ URL, articleCount, declarative }) => __awaiter(void 0, void 0, void 0, function* () {
     const articles = [];
     const result = yield axios_1.default.get(URL);
     const $ = cheerio_1.default.load(result.data);
@@ -151,49 +198,263 @@ const fetchTheWireArticles = ({ URL, articleCount }) => __awaiter(void 0, void 0
             });
         }
     });
-    return articles;
+    declarative && console.log('✅ Fetched The Wire\'s articles.');
+    articles.reverse();
+    let newPosts = false;
+    try {
+        const lastArticleID = fs_1.default.readFileSync('./thewire.mohini', { encoding: 'utf-8' }).toString();
+        const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+        if (lastArticleID === articles[articles.length - 1].articleID) {
+            newPosts = false;
+        }
+        else if (lastArticleIDIndex !== -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./thewire.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+            articles.splice(0, lastArticleIDIndex + 1);
+        }
+        else if (lastArticleIDIndex === -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./thewire.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+    }
+    catch (e) {
+        newPosts = true;
+        if (e.code === 'ENOENT') {
+            fs_1.default.writeFileSync('./thewire.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+        else {
+            console.error(e);
+        }
+    }
+    if (newPosts) {
+        declarative && console.log('🔥 New articles to post from The Wire!');
+        const articleTexts = yield Promise.all(articles.map((article) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchTheWireArticle(article.articleLink); }))), articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
+        articles.forEach((article, i, array) => array[i] = Object.assign(Object.assign({}, article), { caption: `${lodash_1.default.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n')}\n⠀\n${articleHashtags[i]}\n⠀\nSource: The Wire` }));
+        return articles;
+    }
+    else {
+        return [];
+    }
+});
+const fetchSwarajyaArticle = (URL) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const result = yield axios_1.default.get(URL);
+    const $ = cheerio_1.default.load(result.data);
+    let article = '';
+    $('.story-element.story-element-text:not(.story-element-text-summary) > div > p').each((_i, element) => {
+        const paragraph = $(element).text();
+        if (paragraph !== null) {
+            article = article.concat(`\n${striptags_1.default(paragraph)}`);
+        }
+    });
+    return {
+        headerImageURL: `https:${(_b = lodash_1.default.maxBy(srcset_1.default.parse((_a = $('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset')) !== null && _a !== void 0 ? _a : ''), o => o.width)) === null || _b === void 0 ? void 0 : _b.url}`,
+        caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+    };
+});
+const fetchSwarajyaArticles = ({ URL, articleCount, declarative }) => __awaiter(void 0, void 0, void 0, function* () {
+    const articles = [];
+    const result = yield axios_1.default.get(URL);
+    const $ = cheerio_1.default.load(result.data);
+    $('.latest-m__load-more-lt-container__XnqhO > div').each((i, element) => {
+        var _a, _b, _c;
+        if (i < articleCount) {
+            const headerImageURL = '';
+            const title = (_a = $(element).find('.latest-m__card__3vkwo > .latest-m__card-content__3MfaP > .latest-m__card-headline__7-HCL').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`)) !== null && _a !== void 0 ? _a : '';
+            const category = '';
+            const articleLink = URL + ((_b = $(element).find('.latest-m__card__3vkwo > a').attr('href')) !== null && _b !== void 0 ? _b : '');
+            const articleID = articleLink ? kirak32_1.default(articleLink) : '0';
+            const author = (_c = $(element).find('.latest-m__card__3vkwo > .latest-m__card-content__3MfaP > .latest-m__card-author__2sAya').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`)) !== null && _c !== void 0 ? _c : '';
+            articles.push({
+                headerImageURL,
+                title,
+                category,
+                articleLink,
+                articleID,
+                author: author === 'Swarajya Staff' ? 'External Sources' : author,
+                excerpt: '',
+                source: sources_1.SWARAJYA,
+                caption: ''
+            });
+        }
+    });
+    declarative && console.log('✅ Fetched Swarajya\'s articles.');
+    articles.reverse();
+    let newPosts = false;
+    try {
+        const lastArticleID = fs_1.default.readFileSync('./swarajya.mohini', { encoding: 'utf-8' }).toString();
+        const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+        if (lastArticleID === articles[articles.length - 1].articleID) {
+            newPosts = false;
+        }
+        else if (lastArticleIDIndex !== -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./swarajya.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+            articles.splice(0, lastArticleIDIndex + 1);
+        }
+        else if (lastArticleIDIndex === -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./swarajya.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+    }
+    catch (e) {
+        newPosts = true;
+        if (e.code === 'ENOENT') {
+            fs_1.default.writeFileSync('./swarajya.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+        else {
+            console.error(e);
+        }
+    }
+    if (newPosts) {
+        declarative && console.log('🔥 New articles to post from Swarajya!');
+        const articleTextsAndHeaderImageURLs = yield Promise.all(articles.map((article) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchSwarajyaArticle(article.articleLink); }))), articleHashtags = articleTextsAndHeaderImageURLs.map(articleTextsAndHeaderImageURL => getHashtags(articleTextsAndHeaderImageURL.caption));
+        articles.forEach((article, i, array) => array[i] = Object.assign(Object.assign({}, article), { headerImageURL: articleTextsAndHeaderImageURLs[i].headerImageURL, caption: `${lodash_1.default.truncate(articleTextsAndHeaderImageURLs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n')}\n⠀\n${articleHashtags[i]}\n⠀\nSource: Swarajya Magazine` }));
+        return articles;
+    }
+    else {
+        return [];
+    }
 });
 const createPost = (headerImageURL, title, excerpt, index) => __awaiter(void 0, void 0, void 0, function* () {
     const image = new jimp_1.default(1000, 1000, '#FFFFFF');
     const headerImage = (yield jimp_1.default.read(headerImageURL)).cover(1000, 500);
     const logo = (yield jimp_1.default.read('./assets/logo/thewiredwatermark.jpg')).resize(125, 50);
-    const titleFont = yield jimp_1.default.loadFont('./assets/fonts/josefin-sans-48-black-bold/josefin-sans-48-black-bold.fnt');
-    const excerptFont = yield jimp_1.default.loadFont('./assets/fonts/josefin-sans-40-black-light/josefin-sans-40-black-light.fnt');
     let computedHeight = 0;
-    // Add header image.
-    image.composite(headerImage, 0, 0, {
-        mode: jimp_1.default.BLEND_SOURCE_OVER,
-        opacityDest: 1,
-        opacitySource: 1
-    });
-    computedHeight = computedHeight + headerImage.getHeight();
-    // Draw left border.
-    image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
-        this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
-    });
-    // Add logo.
-    image.composite(logo, 10, 0, {
-        mode: jimp_1.default.BLEND_SOURCE_OVER,
-        opacityDest: 1,
-        opacitySource: 1
-    });
-    // Print title.
-    const titleHeight = jimp_1.default.measureTextHeight(titleFont, title, 1000 - 50 - 50);
-    image.print(titleFont, 50, headerImage.getHeight() + 30, title, 1000 - 50 - 50, titleHeight);
-    computedHeight = computedHeight + titleHeight + 30;
-    // Draw middle border.
-    image.scan(0, computedHeight + 20, 1000, 10, function (_x, _y, offset) {
-        this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
-    });
-    computedHeight = computedHeight + 20 + 10;
-    // Print excerpt.
-    image.print(excerptFont, 50, computedHeight, {
-        text: excerpt,
-        alignmentX: jimp_1.default.HORIZONTAL_ALIGN_LEFT,
-        alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
-    }, 1000 - 50 - 50, 1000 - computedHeight);
+    const randomIndex = Math.floor(Math.random() * 3);
+    if (randomIndex === 0) {
+        const titleFont = yield jimp_1.default.loadFont('./assets/fonts/josefin-sans-48-black-bold/josefin-sans-48-black-bold.fnt');
+        const excerptFont = yield jimp_1.default.loadFont('./assets/fonts/josefin-sans-40-black-light/josefin-sans-40-black-light.fnt');
+        // Add header image.
+        image.composite(headerImage, 0, 0, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        computedHeight = computedHeight + headerImage.getHeight();
+        // Draw left border.
+        image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
+            this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+        });
+        // Add logo.
+        image.composite(logo, 10, 0, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        // Print title.
+        const titleHeight = jimp_1.default.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+        image.print(titleFont, 50, headerImage.getHeight() + 30, title, 1000 - 50 - 50, titleHeight);
+        computedHeight = computedHeight + titleHeight + 30;
+        // Draw middle border.
+        image.scan(0, computedHeight + 20, 1000, 10, function (_x, _y, offset) {
+            this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+        });
+        computedHeight = computedHeight + 20 + 10;
+        // Print excerpt.
+        image.print(excerptFont, 50, computedHeight, {
+            text: excerpt,
+            alignmentX: jimp_1.default.HORIZONTAL_ALIGN_LEFT,
+            alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
+        }, 1000 - 50 - 50, 1000 - computedHeight);
+    }
+    else if (randomIndex === 1) {
+        const smallTitleFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-48-black-bold/roboto-48-black-bold.fnt');
+        const largeTitleFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-64-black-bold/roboto-64-black-bold.fnt');
+        const excerptFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-32-black-regular/roboto-32-black-regular.fnt');
+        let titleFont = smallTitleFont;
+        // Add header image.
+        image.composite(headerImage, 0, 0, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        computedHeight = computedHeight + headerImage.getHeight();
+        // Add logo.
+        image.composite(logo, 0, 0, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        // Calculate theoretical height with small title.
+        const totalHeight = 500 + (30 + jimp_1.default.measureTextHeight(smallTitleFont, title, 1000 - 50 - 50)) + (30 + 10) + (50 + jimp_1.default.measureTextHeight(excerptFont, excerpt, 1000 - 50 - 50) + 50);
+        if (totalHeight <= 900) {
+            // Use large title.
+            titleFont = largeTitleFont;
+        }
+        else {
+            // Use small title.
+            titleFont = smallTitleFont;
+        }
+        // Print title.
+        const titleHeight = jimp_1.default.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+        image.print(titleFont, 50, headerImage.getHeight() + 30, {
+            text: title,
+            alignmentX: jimp_1.default.HORIZONTAL_ALIGN_CENTER,
+            alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
+        }, 1000 - 50 - 50, titleHeight);
+        computedHeight = computedHeight + titleHeight + 30;
+        // Draw middle border.
+        image.scan(50, computedHeight + 30, 900, 10, function (_x, _y, offset) {
+            this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+        });
+        computedHeight = computedHeight + 30 + 10;
+        // Print excerpt.
+        image.print(excerptFont, 50, computedHeight, {
+            text: excerpt,
+            alignmentX: jimp_1.default.HORIZONTAL_ALIGN_CENTER,
+            alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
+        }, 1000 - 50 - 50, 1000 - computedHeight);
+        computedHeight = 1000;
+    }
+    else if (randomIndex === 2) {
+        const smallTitleFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-48-black-bold/roboto-48-black-bold.fnt');
+        const largeTitleFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-64-black-bold/roboto-64-black-bold.fnt');
+        const excerptFont = yield jimp_1.default.loadFont('./assets/fonts/roboto-32-black-regular/roboto-32-black-regular.fnt');
+        let titleFont = smallTitleFont;
+        // Add header image.
+        image.composite(headerImage, 0, 500, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        // Draw left border.
+        image.scan(0, 0, 10, 1000, function (_x, _y, offset) {
+            this.bitmap.data.writeUInt32BE(0xBD000AFF, offset);
+        });
+        // Add logo.
+        image.composite(logo, 875, 0, {
+            mode: jimp_1.default.BLEND_SOURCE_OVER,
+            opacityDest: 1,
+            opacitySource: 1
+        });
+        // Calculate theoretical height with small title.
+        const totalHeight = (75 + jimp_1.default.measureTextHeight(smallTitleFont, title, 1000 - 50 - 50)) + (25 + jimp_1.default.measureTextHeight(excerptFont, excerpt, 1000 - 50 - 50) + 50);
+        if (totalHeight <= 420) {
+            // Use large title.
+            titleFont = largeTitleFont;
+        }
+        else {
+            // Use small title.
+            titleFont = smallTitleFont;
+        }
+        // Print title.
+        const titleHeight = jimp_1.default.measureTextHeight(titleFont, title, 1000 - 50 - 50);
+        image.print(titleFont, 50, 75, {
+            text: title,
+            alignmentX: jimp_1.default.HORIZONTAL_ALIGN_LEFT,
+            alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
+        }, 1000 - 50 - 50, titleHeight);
+        computedHeight = computedHeight + titleHeight + 75;
+        // Print excerpt.
+        image.print(excerptFont, 50, computedHeight + 25, {
+            text: excerpt,
+            alignmentX: jimp_1.default.HORIZONTAL_ALIGN_LEFT,
+            alignmentY: jimp_1.default.VERTICAL_ALIGN_MIDDLE
+        }, 1000 - 50 - 50, 500 - computedHeight - 25 - 50);
+    }
     image.write(`./assets/output/posts/${index}.jpg`);
-    // return await image.getBase64Async(Jimp.MIME_JPEG);
+    return;
 });
 const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, void 0, function* () {
     const image = new jimp_1.default(1080, 1920, '#000000');
@@ -260,99 +521,44 @@ const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, 
         }, (1080 - 50 - 50), (1820 - 1060));
     }
     image.write(`./assets/output/story/${index}.jpg`);
-    // return await image.getBase64Async(Jimp.MIME_JPEG);
 });
 const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, function* () {
-    const opIndiaArticles = (yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 5 })).reverse(), theWireArticles = (yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 5 })).reverse();
-    declarative && console.log('✅ Fetched OpIndia and TheWire articles.');
-    let lastOpIndiaArticleID = '', lastTheWireArticleID = '', newOpIndiaPosts = false, newTheWirePosts = false, articles = [];
-    try {
-        lastOpIndiaArticleID = fs_1.default.readFileSync('./opindia.mohini', { encoding: 'utf-8' }).toString();
-        const lastOpIndiaArticleIDIndex = opIndiaArticles.findIndex(opIndiaArticle => opIndiaArticle.articleID === lastOpIndiaArticleID);
-        if (lastOpIndiaArticleID === opIndiaArticles[opIndiaArticles.length - 1].articleID) {
-            newOpIndiaPosts = false;
-        }
-        else if (lastOpIndiaArticleIDIndex !== -1) {
-            newOpIndiaPosts = true;
-            fs_1.default.writeFileSync('./opindia.mohini', opIndiaArticles[opIndiaArticles.length - 1].articleID, { encoding: 'utf-8' });
-            opIndiaArticles.splice(0, lastOpIndiaArticleIDIndex + 1);
-        }
-        else if (lastOpIndiaArticleIDIndex === -1) {
-            newOpIndiaPosts = true;
-            fs_1.default.writeFileSync('./opindia.mohini', opIndiaArticles[opIndiaArticles.length - 1].articleID, { encoding: 'utf-8' });
-        }
-    }
-    catch (e) {
-        newOpIndiaPosts = true;
-        if (e.code === 'ENOENT') {
-            fs_1.default.writeFileSync('./opindia.mohini', opIndiaArticles[opIndiaArticles.length - 1].articleID, { encoding: 'utf-8' });
-        }
-        else {
-            console.error(e);
-        }
-    }
-    try {
-        lastTheWireArticleID = fs_1.default.readFileSync('./thewire.mohini', { encoding: 'utf-8' }).toString();
-        const lastTheWireArticleIDIndex = theWireArticles.findIndex(theWireArticle => theWireArticle.articleID === lastTheWireArticleID);
-        if (lastTheWireArticleID === theWireArticles[theWireArticles.length - 1].articleID) {
-            newTheWirePosts = false;
-        }
-        else if (lastTheWireArticleIDIndex !== -1) {
-            newTheWirePosts = true;
-            fs_1.default.writeFileSync('./thewire.mohini', theWireArticles[theWireArticles.length - 1].articleID, { encoding: 'utf-8' });
-            theWireArticles.splice(0, lastTheWireArticleIDIndex + 1);
-        }
-        else if (lastTheWireArticleIDIndex === -1) {
-            newTheWirePosts = true;
-            fs_1.default.writeFileSync('./thewire.mohini', theWireArticles[theWireArticles.length - 1].articleID, { encoding: 'utf-8' });
-        }
-    }
-    catch (e) {
-        newTheWirePosts = true;
-        if (e.code === 'ENOENT') {
-            fs_1.default.writeFileSync('./thewire.mohini', theWireArticles[theWireArticles.length - 1].articleID, { encoding: 'utf-8' });
-        }
-        else {
-            console.error(e);
-        }
-    }
-    if (!newOpIndiaPosts && !newTheWirePosts) {
-        declarative && console.log('🧊 No new articles to post!');
+    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 5, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 5, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 5, declarative });
+    const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
+    if (articles.length === 0) {
+        declarative && console.log('🥶 No new articles to post!');
         return;
     }
-    else {
-        declarative && console.log('🔥 New articles to post!');
-    }
-    const opIndiaArticleTexts = yield Promise.all(opIndiaArticles.map((opIndiaArticle) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchOpIndiaArticle(opIndiaArticle.articleLink); }))), theWireArticleTexts = yield Promise.all(theWireArticles.map((theWireArticle) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchTheWireArticle(theWireArticle.articleLink); }))), opIndiaArticleHashtags = opIndiaArticleTexts.map(opIndiaArticleText => getHashtags(opIndiaArticleText)), theWireArticleHashtags = theWireArticleTexts.map(theWireArticleText => getHashtags(theWireArticleText));
-    opIndiaArticles.forEach((opIndiaArticle, i, array) => array[i] = Object.assign(Object.assign({}, opIndiaArticle), { caption: `${lodash_1.default.truncate(opIndiaArticleTexts[i], { length: 2000 - opIndiaArticleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n')}\n⠀\n${opIndiaArticleHashtags[i]}` }));
-    theWireArticles.forEach((theWireArticle, i, array) => array[i] = Object.assign(Object.assign({}, theWireArticle), { caption: `${lodash_1.default.truncate(theWireArticleTexts[i], { length: 2000 - theWireArticleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n')}\n⠀\n${theWireArticleHashtags[i]}` }));
-    articles = articles.concat(opIndiaArticles).concat(theWireArticles);
-    articles = knuthShuffle(articles);
     for (const [i, article] of articles.entries()) {
         if (article.source === sources_1.THEWIRE) {
             const result = yield axios_1.default.get(article.articleLink);
             const $ = cheerio_1.default.load(result.data);
             article.excerpt = $('.shortDesc').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
         }
+        else if (article.source === sources_1.SWARAJYA) {
+            const result = yield axios_1.default.get(article.articleLink);
+            const $ = cheerio_1.default.load(result.data);
+            article.excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+        }
         declarative && console.log(`🌺 Posting ${article.articleID} as a photo...`);
-        yield createPost(article.headerImageURL, article.title, article.excerpt, i);
-        yield sleep(5 * 1000);
+        yield createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
+        yield sleep(Math.round(Math.random() * 4000) + 1000);
         yield ig.publish.photo({
             file: fs_1.default.readFileSync(`./assets/output/posts/${i}.jpg`),
             caption: article.caption
         });
         declarative && console.log('✅ Posted!');
-        declarative && console.log('⌚ Waiting 30 seconds to avoid ban...');
-        yield sleep(30 * 1000);
+        declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
+        yield sleep(Math.round(Math.random() * 15000) + 15000);
         declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
-        yield createStory(article.headerImageURL, article.title, i);
-        yield sleep(5 * 1000);
+        yield createStory(article.headerImageURL, article.title.trim(), i);
+        yield sleep(Math.round(Math.random() * 4000) + 1000);
         yield ig.publish.story({
             file: fs_1.default.readFileSync(`./assets/output/story/${i}.jpg`)
         });
-        declarative && console.log('⌚ Waiting 30 seconds to avoid ban...');
-        yield sleep(30 * 1000);
         declarative && console.log('✅ Posted!');
+        declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
+        yield sleep(Math.round(Math.random() * 15000) + 15000);
     }
     declarative && console.log('✅ All articles were posted!');
 });
@@ -362,7 +568,9 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     ig.state.generateDevice(credentials_1.IG_USERNAME);
     declarative && console.log('✅ Generated new device.');
     declarative && console.log('🌺 Logging in...');
+    yield ig.simulate.preLoginFlow();
     yield ig.account.login(credentials_1.IG_USERNAME, credentials_1.IG_PASSWORD);
+    process.nextTick(() => __awaiter(void 0, void 0, void 0, function* () { return yield ig.simulate.postLoginFlow(); }));
     declarative && console.log('✅ Logged in to account.');
     // First run.
     declarative && console.log('🌺 Checking for new articles...');
@@ -372,7 +580,49 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         declarative && console.log('🌺 Checking for new articles...');
         yield checkAndPublish(ig, declarative);
         declarative && console.log('⌚ Checking in after 30 minutes!');
-    }), 30 * 60 * 1000);
+    }), 30 * MINUTE);
+    // Follow new users (2 of n).
+    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+        declarative && console.log('🌺 Following 50 users...');
+        const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
+        while (targetIndexes.length < 25) {
+            const r = Math.floor(Math.random() * followCount);
+            if (targetIndexes.indexOf(r) === -1)
+                targetIndexes.push(r);
+        }
+        for (const targetIndex of targetIndexes) {
+            const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
+            while (subTargetIndexes.length < 2) {
+                const r = Math.floor(Math.random() * followCount);
+                if (subTargetIndexes.indexOf(r) === -1)
+                    subTargetIndexes.push(r);
+            }
+            for (const subTargetIndex of subTargetIndexes) {
+                ig.friendship.create(followerFollowers[subTargetIndex].pk);
+                const time = Math.round(Math.random() * 1000) + 1000;
+                yield sleep(time);
+            }
+            const time = Math.round(Math.random() * 9000) + 1000;
+            yield sleep(time);
+        }
+        declarative && console.log('✅ 50 users followed!');
+    }), 3.3 * HOUR);
+    // Unfollow users.
+    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+        declarative && console.log('🌺 Unfollowing 50 users...');
+        const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
+        for (const [i, user] of notFollowingYou.entries()) {
+            if (i <= 49) {
+                yield ig.friendship.destroy(user.pk);
+                const time = Math.round(Math.random() * 9000) + 1000;
+                yield sleep(time);
+            }
+            else {
+                break;
+            }
+        }
+        declarative && console.log('✅ 50 users unfollowed!');
+    }), 4 * HOUR);
 });
 engine({ declarative: true });
 //# sourceMappingURL=index.js.map
