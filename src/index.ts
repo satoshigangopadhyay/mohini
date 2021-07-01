@@ -317,12 +317,8 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
   }
   try {
     lastTheWireArticleID = fs.readFileSync('./thewire.mohini', { encoding: 'utf-8' }).toString();
-    console.log(lastTheWireArticleID);
     const lastTheWireArticleIDIndex = theWireArticles.findIndex(theWireArticle => theWireArticle.articleID === lastTheWireArticleID);
-    console.log(lastTheWireArticleIDIndex);
-    console.log(theWireArticles);
     if (lastTheWireArticleID === theWireArticles[ theWireArticles.length - 1 ].articleID) {
-      console.log('nothing new');
       newTheWirePosts = false;
     } else if (lastTheWireArticleIDIndex !== -1) {
       newTheWirePosts = true;
@@ -340,8 +336,6 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
       console.error(e);
     }
   }
-  console.log(0, opIndiaArticles, theWireArticles);
-  console.log(newOpIndiaPosts, newTheWirePosts);
   if (!newOpIndiaPosts && !newTheWirePosts) {
     declarative && console.log('❄️ No new articles to post!');
     return;
