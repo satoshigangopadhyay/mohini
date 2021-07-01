@@ -299,6 +299,7 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     const lastOpIndiaArticleIDIndex = opIndiaArticles.findIndex(opIndiaArticle => opIndiaArticle.articleID === lastOpIndiaArticleID);
     if (lastOpIndiaArticleID === opIndiaArticles[ opIndiaArticles.length - 1 ].articleID) {
       newOpIndiaPosts = false;
+      opIndiaArticles.splice(0, 5);
     } else if (lastOpIndiaArticleIDIndex !== -1) {
       newOpIndiaPosts = true;
       fs.writeFileSync('./opindia.mohini', opIndiaArticles[ opIndiaArticles.length - 1 ].articleID, { encoding: 'utf-8' });
@@ -320,6 +321,7 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     const lastTheWireArticleIDIndex = theWireArticles.findIndex(theWireArticle => theWireArticle.articleID === lastTheWireArticleID);
     if (lastTheWireArticleID === theWireArticles[ theWireArticles.length - 1 ].articleID) {
       newTheWirePosts = false;
+      theWireArticles.splice(0, 5);
     } else if (lastTheWireArticleIDIndex !== -1) {
       newTheWirePosts = true;
       fs.writeFileSync('./thewire.mohini', theWireArticles[ theWireArticles.length - 1 ].articleID, { encoding: 'utf-8' });
