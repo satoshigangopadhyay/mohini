@@ -322,6 +322,7 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     console.log(lastTheWireArticleIDIndex);
     console.log(theWireArticles);
     if (lastTheWireArticleID === theWireArticles[ theWireArticles.length - 1 ].articleID) {
+      console.log('nothing new');
       newTheWirePosts = false;
     } else if (lastTheWireArticleIDIndex !== -1) {
       newTheWirePosts = true;
@@ -339,11 +340,15 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
       console.error(e);
     }
   }
+  console.log(0, opIndiaArticles, theWireArticles);
+  console.log(newOpIndiaPosts, newTheWirePosts);
   if (!newOpIndiaPosts && !newTheWirePosts) {
-    declarative && console.log('🧊 No new articles to post!');
+    declarative && console.log('❄️ No new articles to post!');
     return;
-  } else {
-    declarative && console.log('🔥 New articles to post!');
+  } else if (newOpIndiaPosts) {
+    declarative && console.log('🔥 New articles to post from OpIndia!');
+  } else if (newTheWirePosts) {
+    declarative && console.log('🔥 New articles to post from The Wire!');
   }
   const
     opIndiaArticleTexts = await Promise.all(opIndiaArticles.map(async (opIndiaArticle) => await fetchOpIndiaArticle(opIndiaArticle.articleLink))),
