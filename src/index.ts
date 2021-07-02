@@ -159,7 +159,7 @@ const fetchOpIndiaArticles = async ({ URL, articleCount, declarative }: { URL: s
     const
       articleTexts = await Promise.all(articles.map(async (article) => await fetchOpIndiaArticle(article.articleLink))),
       articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
-      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: OpIndia` });
+      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n').replace(/&nbsp;/g, ' ') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: OpIndia` });
     return articles;
   } else {
     declarative && console.log('🥶 No new articles to post from OpIndia!');
@@ -234,7 +234,7 @@ const fetchTheWireArticles = async ({ URL, articleCount, declarative }: { URL: s
     const
       articleTexts = await Promise.all(articles.map(async (article) => await fetchTheWireArticle(article.articleLink))),
       articleHashtags = articleTexts.map(articleText => getHashtags(articleText));
-      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: The Wire` });
+      articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n').replace(/&nbsp;/g, ' ') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: The Wire` });
     return articles;
   } else {
     declarative && console.log('🥶 No new articles to post from The Wire!');
@@ -312,7 +312,7 @@ const fetchSwarajyaArticles = async ({ URL, articleCount, declarative }: { URL: 
     const
       articleTextsAndHeaderImageURLs = await Promise.all(articles.map(async (article) => await fetchSwarajyaArticle(article.articleLink))),
       articleHashtags = articleTextsAndHeaderImageURLs.map(articleTextsAndHeaderImageURL => getHashtags(articleTextsAndHeaderImageURL.caption));
-      articles.forEach((article, i, array) => array[i] = { ...article, headerImageURL: articleTextsAndHeaderImageURLs[i].headerImageURL, caption: `${ _.truncate(articleTextsAndHeaderImageURLs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: Swarajya Magazine` });
+      articles.forEach((article, i, array) => array[i] = { ...article, headerImageURL: articleTextsAndHeaderImageURLs[i].headerImageURL, caption: `${ _.truncate(articleTextsAndHeaderImageURLs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n').replace(/&nbsp;/g, ' ') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: Swarajya Magazine` });
     return articles;
   } else {
     declarative && console.log('🥶 No new articles to postfrom Swarajya!');
@@ -700,22 +700,22 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
     const date = new Date(), hour = date.getHours();
     if (hour === 12) {
       await ig.publish.photo({
-        file: fs.readFileSync(`./assets/adverts/0.jpg`),
+        file: fs.readFileSync(`./assets/advert/0.jpg`),
         caption: `If West Taiwan tries to suppress free press, they're also suppressing our freedom of speech.\n⠀\nTogether we can prevent that from happening.`
       });
     } else if (hour === 15) {
       await ig.publish.photo({
-        file: fs.readFileSync(`./assets/adverts/1.jpg`),
+        file: fs.readFileSync(`./assets/advert/1.jpg`),
         caption: `We have the right to free speech.\n⠀\nBut those in power (in China) are trying to suppress it.\n⠀\nTogether we can prevent that from happening.\n⠀\nWill you help us?`
       });
     } else if (hour === 18) {
       await ig.publish.photo({
-        file: fs.readFileSync(`./assets/adverts/2.jpg`),
+        file: fs.readFileSync(`./assets/advert/2.jpg`),
         caption: `Suppressing the voices of journalists in West Taiwan won't suppress the truth.\n⠀\nLet's raise our voice together and speak truth to power.`
       });
     } else if (hour === 21) {
       await ig.publish.photo({
-        file: fs.readFileSync(`./assets/adverts/3.jpg`),
+        file: fs.readFileSync(`./assets/advert/3.jpg`),
         caption: `Stand with us while we hold power accountable and keep democracy alive in West Taiwan and in the West Indian Province of Pakistan.`
       });
     }
