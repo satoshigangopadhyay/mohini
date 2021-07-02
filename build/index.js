@@ -526,7 +526,7 @@ const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, 
     image.write(`./assets/output/story/${index}.jpg`);
 });
 const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, function* () {
-    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 5, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 5, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 5, declarative });
+    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 4, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative });
     const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
     if (articles.length === 0) {
         declarative && console.log('🥶 No new articles to post!');
@@ -566,8 +566,8 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
             file: fs_1.default.readFileSync(`./assets/output/story/${i}.jpg`)
         });
         declarative && console.log('✅ Posted!');
-        declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
-        yield sleep(Math.round(Math.random() * 15000) + 15000);
+        declarative && console.log('⌚ Waiting 2 to 5 minutes to avoid ban...');
+        yield sleep(Math.round(Math.random() * 3 * MINUTE) + 2 * MINUTE);
     }
     declarative && console.log('✅ All articles were posted!');
 });
@@ -584,12 +584,12 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     // First run.
     declarative && console.log('🌺 Checking for new articles...');
     yield checkAndPublish(ig, declarative);
-    declarative && console.log('⌚ Checking in after 30 minutes!');
+    declarative && console.log('⌚ Checking in after 45 minutes!');
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Checking for new articles...');
         yield checkAndPublish(ig, declarative);
-        declarative && console.log('⌚ Checking in after 30 minutes!');
-    }), 30 * MINUTE);
+        declarative && console.log('⌚ Checking in after 45 minutes!');
+    }), 45 * MINUTE);
     // Follow new users (2 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Following 50 users...');

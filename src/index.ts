@@ -551,11 +551,11 @@ const createStory = async (headerImageURL: string, title: string, index: number)
   image.write(`./assets/output/story/${ index }.jpg`);
 };
 
-const checkAndPublish = async (ig: IgApiClient | any, declarative: boolean) => {
+const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
   const
-    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 5, declarative }),
-    theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 5, declarative }),
-    swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 5, declarative });
+    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 4, declarative }),
+    theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 3, declarative }),
+    swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 3, declarative });
   const articles = knuthShuffle<IArticle>(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
   if (articles.length === 0) {
     declarative && console.log('🥶 No new articles to post!');
@@ -593,8 +593,8 @@ const checkAndPublish = async (ig: IgApiClient | any, declarative: boolean) => {
       file: fs.readFileSync(`./assets/output/story/${ i }.jpg`)
     });
     declarative && console.log('✅ Posted!');
-    declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
-    await sleep(Math.round(Math.random() * 15000) + 15000);
+    declarative && console.log('⌚ Waiting 2 to 5 minutes to avoid ban...');
+    await sleep(Math.round(Math.random() * 3 * MINUTE) + 2 * MINUTE);
   }
   declarative && console.log('✅ All articles were posted!');
 };
@@ -613,13 +613,13 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
   // First run.
   declarative && console.log('🌺 Checking for new articles...');
   await checkAndPublish(ig, declarative);
-  declarative && console.log('⌚ Checking in after 30 minutes!');
+  declarative && console.log('⌚ Checking in after 45 minutes!');
 
   setInterval(async () => {
     declarative && console.log('🌺 Checking for new articles...');
     await checkAndPublish(ig, declarative);
-    declarative && console.log('⌚ Checking in after 30 minutes!');
-  }, 30 * MINUTE);
+    declarative && console.log('⌚ Checking in after 45 minutes!');
+  }, 45 * MINUTE);
 
   // Follow new users (2 of n).
   setInterval(async () => {
