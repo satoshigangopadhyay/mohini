@@ -34,7 +34,7 @@ const MINUTE = 60 * 1000, HOUR = 60 * MINUTE;
 
 
 // Functions:
-const knuthShuffle = (array: any[]) => {
+const knuthShuffle = <T>(array: any[]): T[] => {
   let currentIndex = array.length, randomIndex;
   while (0 !== currentIndex) {
     randomIndex = Math.floor(Math.random() * currentIndex);
@@ -162,6 +162,7 @@ const fetchOpIndiaArticles = async ({ URL, articleCount, declarative }: { URL: s
       articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: OpIndia` });
     return articles;
   } else {
+    declarative && console.log('🥶 No new articles to post from OpIndia!');
     return [];
   }
 };
@@ -236,6 +237,7 @@ const fetchTheWireArticles = async ({ URL, articleCount, declarative }: { URL: s
       articles.forEach((article, i, array) => array[i] = { ...article, caption: `${ _.truncate(articleTexts[i], { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: The Wire` });
     return articles;
   } else {
+    declarative && console.log('🥶 No new articles to post from The Wire!');
     return [];
   }
 };
@@ -313,6 +315,7 @@ const fetchSwarajyaArticles = async ({ URL, articleCount, declarative }: { URL: 
       articles.forEach((article, i, array) => array[i] = { ...article, headerImageURL: articleTextsAndHeaderImageURLs[i].headerImageURL, caption: `${ _.truncate(articleTextsAndHeaderImageURLs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: Swarajya Magazine` });
     return articles;
   } else {
+    declarative && console.log('🥶 No new articles to postfrom Swarajya!');
     return [];
   }
 };
@@ -553,7 +556,7 @@ const checkAndPublish = async (ig: IgApiClient | any, declarative: boolean) => {
     opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 5, declarative }),
     theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 5, declarative }),
     swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 5, declarative });
-  const articles: IArticle[] = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
+  const articles = knuthShuffle<IArticle>(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
   if (articles.length === 0) {
     declarative && console.log('🥶 No new articles to post!');
     return;
@@ -566,7 +569,12 @@ const checkAndPublish = async (ig: IgApiClient | any, declarative: boolean) => {
     } else if (article.source === SWARAJYA) {
       const result = await axios.get(article.articleLink);
       const $ = cheerio.load(result.data);
-      article.excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+      const excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+      if (excerpt === '') {
+        article.excerpt = _.truncate(article.caption, { length: 100 });
+      } else {
+        article.excerpt = excerpt;
+      }
     }
     declarative && console.log(`🌺 Posting ${ article.articleID } as a photo...`);
     await createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
@@ -598,7 +606,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
   declarative && console.log('✅ Generated new device.');
   declarative && console.log('🌺 Logging in...');
   await ig.simulate.preLoginFlow();
-  await ig.account.login(IG_USERNAME, IG_PASSWORD);
+  const loggedInUser = await ig.account.login(IG_USERNAME, IG_PASSWORD);
   process.nextTick(async () => await ig.simulate.postLoginFlow());
   declarative && console.log('✅ Logged in to account.');
 
@@ -630,17 +638,21 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         followerFollowersFeed = ig.feed.accountFollowers(followers[ targetIndex ].pk),
         followerFollowers = await followerFollowersFeed.items(),
         subTargetIndexes = [];
-      while (subTargetIndexes.length < 2) {
-        const r = Math.floor(Math.random() * followCount);
-        if (subTargetIndexes.indexOf(r) === -1) subTargetIndexes.push(r);
-      }
-      for (const subTargetIndex of subTargetIndexes) {
-        ig.friendship.create(followerFollowers[ subTargetIndex ].pk);
-        const time = Math.round(Math.random() * 1000) + 1000;
+      if (followerFollowers.length > 0) {
+        while (subTargetIndexes.length < 2) {
+          const r = Math.floor(Math.random() * followerFollowers.length);
+          if (subTargetIndexes.indexOf(r) === -1) subTargetIndexes.push(r);
+        }
+        for (const subTargetIndex of subTargetIndexes) {
+          ig.friendship.create(followerFollowers[ subTargetIndex ].pk);
+          const time = Math.round(Math.random() * 1000) + 1000;
+          await sleep(time);
+        }
+        const time = Math.round(Math.random() * 9000) + 1000;
         await sleep(time);
+      } else {
+        continue;
       }
-      const time = Math.round(Math.random() * 9000) + 1000;
-      await sleep(time);
     }
     declarative && console.log('✅ 50 users followed!');
   }, 3.3 * HOUR);
@@ -666,6 +678,48 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
     }
     declarative && console.log('✅ 50 users unfollowed!');
   }, 4 * HOUR);
+
+  // Cannibalize stories >6 hours.
+  setInterval(async () => {
+    declarative && console.log('🌺 Deleting old stories...');
+    const
+      storiesFeed = ig.feed.userStory(loggedInUser.pk),
+      stories = await getAllItemsFromFeed(storiesFeed);
+    for (const story of stories) {
+      if ( (((Date.now() / 1000) - story.taken_at) / 60 / 60) > 6 ) {
+        await ig.media.delete({ mediaId: story.id });
+        const time = Math.round(Math.random() * 9000) + 1000;
+        await sleep(time);
+      }
+    }
+    declarative && console.log('✅ Old stories deleted!');
+  }, 2.5 * HOUR);
+
+  // Post promotional material.
+  setInterval(async () => {
+    const date = new Date(), hour = date.getHours();
+    if (hour === 12) {
+      await ig.publish.photo({
+        file: fs.readFileSync(`./assets/adverts/0.jpg`),
+        caption: `If West Taiwan tries to suppress free press, they're also suppressing our freedom of speech.\n⠀\nTogether we can prevent that from happening.`
+      });
+    } else if (hour === 15) {
+      await ig.publish.photo({
+        file: fs.readFileSync(`./assets/adverts/1.jpg`),
+        caption: `We have the right to free speech.\n⠀\nBut those in power (in China) are trying to suppress it.\n⠀\nTogether we can prevent that from happening.\n⠀\nWill you help us?`
+      });
+    } else if (hour === 18) {
+      await ig.publish.photo({
+        file: fs.readFileSync(`./assets/adverts/2.jpg`),
+        caption: `Suppressing the voices of journalists in West Taiwan won't suppress the truth.\n⠀\nLet's raise our voice together and speak truth to power.`
+      });
+    } else if (hour === 21) {
+      await ig.publish.photo({
+        file: fs.readFileSync(`./assets/adverts/3.jpg`),
+        caption: `Stand with us while we hold power accountable and keep democracy alive in West Taiwan and in the West Indian Province of Pakistan.`
+      });
+    }
+  }, 1 * HOUR);
 };
 
 engine({ declarative: true });

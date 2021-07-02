@@ -157,6 +157,7 @@ const fetchOpIndiaArticles = ({ URL, articleCount, declarative }) => __awaiter(v
         return articles;
     }
     else {
+        declarative && console.log('🥶 No new articles to post from OpIndia!');
         return [];
     }
 });
@@ -233,6 +234,7 @@ const fetchTheWireArticles = ({ URL, articleCount, declarative }) => __awaiter(v
         return articles;
     }
     else {
+        declarative && console.log('🥶 No new articles to post from The Wire!');
         return [];
     }
 });
@@ -313,6 +315,7 @@ const fetchSwarajyaArticles = ({ URL, articleCount, declarative }) => __awaiter(
         return articles;
     }
     else {
+        declarative && console.log('🥶 No new articles to postfrom Swarajya!');
         return [];
     }
 });
@@ -538,7 +541,13 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
         else if (article.source === sources_1.SWARAJYA) {
             const result = yield axios_1.default.get(article.articleLink);
             const $ = cheerio_1.default.load(result.data);
-            article.excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+            const excerpt = $('.story-element.story-element-text.story-element-text-summary > div > p').first().text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`);
+            if (excerpt === '') {
+                article.excerpt = lodash_1.default.truncate(article.caption, { length: 100 });
+            }
+            else {
+                article.excerpt = excerpt;
+            }
         }
         declarative && console.log(`🌺 Posting ${article.articleID} as a photo...`);
         yield createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
@@ -569,7 +578,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     declarative && console.log('✅ Generated new device.');
     declarative && console.log('🌺 Logging in...');
     yield ig.simulate.preLoginFlow();
-    yield ig.account.login(credentials_1.IG_USERNAME, credentials_1.IG_PASSWORD);
+    const loggedInUser = yield ig.account.login(credentials_1.IG_USERNAME, credentials_1.IG_PASSWORD);
     process.nextTick(() => __awaiter(void 0, void 0, void 0, function* () { return yield ig.simulate.postLoginFlow(); }));
     declarative && console.log('✅ Logged in to account.');
     // First run.
@@ -592,18 +601,23 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         }
         for (const targetIndex of targetIndexes) {
             const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
-            while (subTargetIndexes.length < 2) {
-                const r = Math.floor(Math.random() * followCount);
-                if (subTargetIndexes.indexOf(r) === -1)
-                    subTargetIndexes.push(r);
-            }
-            for (const subTargetIndex of subTargetIndexes) {
-                ig.friendship.create(followerFollowers[subTargetIndex].pk);
-                const time = Math.round(Math.random() * 1000) + 1000;
+            if (followerFollowers.length > 0) {
+                while (subTargetIndexes.length < 2) {
+                    const r = Math.floor(Math.random() * followerFollowers.length);
+                    if (subTargetIndexes.indexOf(r) === -1)
+                        subTargetIndexes.push(r);
+                }
+                for (const subTargetIndex of subTargetIndexes) {
+                    ig.friendship.create(followerFollowers[subTargetIndex].pk);
+                    const time = Math.round(Math.random() * 1000) + 1000;
+                    yield sleep(time);
+                }
+                const time = Math.round(Math.random() * 9000) + 1000;
                 yield sleep(time);
             }
-            const time = Math.round(Math.random() * 9000) + 1000;
-            yield sleep(time);
+            else {
+                continue;
+            }
         }
         declarative && console.log('✅ 50 users followed!');
     }), 3.3 * HOUR);
@@ -623,6 +637,47 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         }
         declarative && console.log('✅ 50 users unfollowed!');
     }), 4 * HOUR);
+    // Cannibalize stories >6 hours.
+    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+        declarative && console.log('🌺 Deleting old stories...');
+        const storiesFeed = ig.feed.userStory(loggedInUser.pk), stories = yield getAllItemsFromFeed(storiesFeed);
+        for (const story of stories) {
+            if ((((Date.now() / 1000) - story.taken_at) / 60 / 60) > 6) {
+                yield ig.media.delete({ mediaId: story.id });
+                const time = Math.round(Math.random() * 9000) + 1000;
+                yield sleep(time);
+            }
+        }
+        declarative && console.log('✅ Old stories deleted!');
+    }), 2.5 * HOUR);
+    // Post promotional material.
+    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+        const date = new Date(), hour = date.getHours();
+        if (hour === 12) {
+            yield ig.publish.photo({
+                file: fs_1.default.readFileSync(`./assets/adverts/0.jpg`),
+                caption: `If West Taiwan tries to suppress free press, they're also suppressing our freedom of speech.\n⠀\nTogether we can prevent that from happening.`
+            });
+        }
+        else if (hour === 15) {
+            yield ig.publish.photo({
+                file: fs_1.default.readFileSync(`./assets/adverts/1.jpg`),
+                caption: `We have the right to free speech.\n⠀\nBut those in power (in China) are trying to suppress it.\n⠀\nTogether we can prevent that from happening.\n⠀\nWill you help us?`
+            });
+        }
+        else if (hour === 18) {
+            yield ig.publish.photo({
+                file: fs_1.default.readFileSync(`./assets/adverts/2.jpg`),
+                caption: `Suppressing the voices of journalists in West Taiwan won't suppress the truth.\n⠀\nLet's raise our voice together and speak truth to power.`
+            });
+        }
+        else if (hour === 21) {
+            yield ig.publish.photo({
+                file: fs_1.default.readFileSync(`./assets/adverts/3.jpg`),
+                caption: `Stand with us while we hold power accountable and keep democracy alive in West Taiwan and in the West Indian Province of Pakistan.`
+            });
+        }
+    }), 1 * HOUR);
 });
 engine({ declarative: true });
 //# sourceMappingURL=index.js.map
