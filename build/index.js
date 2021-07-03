@@ -615,11 +615,11 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         yield checkAndPublish(ig, declarative);
         declarative && console.log('⌚ Checking in after 45 minutes!');
     }), 45 * MINUTE);
-    // Follow new users (2 of n).
+    // Follow new users (5 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Following 50 users...');
         const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
-        while (targetIndexes.length < 25) {
+        while (targetIndexes.length < 5) {
             const r = Math.floor(Math.random() * followCount);
             if (targetIndexes.indexOf(r) === -1)
                 targetIndexes.push(r);
@@ -627,7 +627,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         for (const targetIndex of targetIndexes) {
             const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
             if (followerFollowers.length > 0) {
-                while (subTargetIndexes.length < 2) {
+                while (subTargetIndexes.length < 5) {
                     const r = Math.floor(Math.random() * followerFollowers.length);
                     if (subTargetIndexes.indexOf(r) === -1)
                         subTargetIndexes.push(r);

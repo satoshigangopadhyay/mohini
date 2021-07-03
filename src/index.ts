@@ -644,7 +644,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
     declarative && console.log('⌚ Checking in after 45 minutes!');
   }, 45 * MINUTE);
 
-  // Follow new users (2 of n).
+  // Follow new users (5 of n).
   setInterval(async () => {
     declarative && console.log('🌺 Following 50 users...');
     const
@@ -652,7 +652,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
       followers = await getAllItemsFromFeed(followersFeed),
       followCount = followers.length,
       targetIndexes = [];
-    while (targetIndexes.length < 25) {
+    while (targetIndexes.length < 5) {
       const r = Math.floor(Math.random() * followCount);
       if (targetIndexes.indexOf(r) === -1) targetIndexes.push(r);
     }
@@ -662,7 +662,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         followerFollowers = await followerFollowersFeed.items(),
         subTargetIndexes = [];
       if (followerFollowers.length > 0) {
-        while (subTargetIndexes.length < 2) {
+        while (subTargetIndexes.length < 5) {
           const r = Math.floor(Math.random() * followerFollowers.length);
           if (subTargetIndexes.indexOf(r) === -1) subTargetIndexes.push(r);
         }
