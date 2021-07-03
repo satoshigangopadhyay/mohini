@@ -239,7 +239,7 @@ const fetchTheWireArticles = ({ URL, articleCount, declarative }) => __awaiter(v
     }
 });
 const fetchSwarajyaArticle = (URL) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const result = yield axios_1.default.get(URL);
     const $ = cheerio_1.default.load(result.data);
     let article = '';
@@ -249,10 +249,18 @@ const fetchSwarajyaArticle = (URL) => __awaiter(void 0, void 0, void 0, function
             article = article.concat(`\n${striptags_1.default(paragraph)}`);
         }
     });
-    return {
-        headerImageURL: `https:${(_b = lodash_1.default.maxBy(srcset_1.default.parse((_a = $('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset')) !== null && _a !== void 0 ? _a : ''), o => o.width)) === null || _b === void 0 ? void 0 : _b.url}`,
-        caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
-    };
+    if ($('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset') === undefined) {
+        return {
+            headerImageURL: `https:${(_b = lodash_1.default.maxBy(srcset_1.default.parse((_a = $('.story-grid-m__smag-img-banner__1sMRD > a > img').attr('srcset')) !== null && _a !== void 0 ? _a : ''), o => o.width)) === null || _b === void 0 ? void 0 : _b.url}`,
+            caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+        };
+    }
+    else {
+        return {
+            headerImageURL: `https:${(_d = lodash_1.default.maxBy(srcset_1.default.parse((_c = $('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset')) !== null && _c !== void 0 ? _c : ''), o => o.width)) === null || _d === void 0 ? void 0 : _d.url}`,
+            caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+        };
+    }
 });
 const fetchSwarajyaArticles = ({ URL, articleCount, declarative }) => __awaiter(void 0, void 0, void 0, function* () {
     const articles = [];

@@ -252,10 +252,17 @@ const fetchSwarajyaArticle = async (URL: string) => {
       article = article.concat(`\n${ striptags(paragraph) }`);
     }
   });
-  return {
-    headerImageURL: `https:${ _.maxBy(srcset.parse($('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset') ?? ''), o => o.width)?.url }`,
-    caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
-  };
+  if ($('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset') === undefined) {
+    return {
+      headerImageURL: `https:${ _.maxBy(srcset.parse($('.story-grid-m__smag-img-banner__1sMRD > a > img').attr('srcset') ?? ''), o => o.width)?.url }`,
+      caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+    };
+  } else {
+    return {
+      headerImageURL: `https:${ _.maxBy(srcset.parse($('.story-grid-m__smag-img-banner__1sMRD > img').attr('srcset') ?? ''), o => o.width)?.url }`,
+      caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+    };
+  }
 };
 
 const fetchSwarajyaArticles = async ({ URL, articleCount, declarative }: { URL: string, articleCount: number, declarative: boolean }) => {
