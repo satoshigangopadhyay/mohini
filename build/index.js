@@ -327,6 +327,87 @@ const fetchSwarajyaArticles = ({ URL, articleCount, declarative }) => __awaiter(
         return [];
     }
 });
+const fetchTimesNowNewsArticle = (URL) => __awaiter(void 0, void 0, void 0, function* () {
+    var _e;
+    const result = yield axios_1.default.get(URL);
+    const $ = cheerio_1.default.load(result.data);
+    let article = '';
+    $('.artical-description > p').each((_i, element) => {
+        const paragraph = $(element).text();
+        if (paragraph !== null) {
+            article = article.concat(`\n${striptags_1.default(paragraph)}`);
+        }
+    });
+    return {
+        headerImageURL: ((_e = $('.artical-description').find('.img-pod > img').attr('data-src')) !== null && _e !== void 0 ? _e : '').replace(/tr=w-[0-9]+,h-[0-9]+/g, 'tr=w-1000,h-500'),
+        category: $('._consumption_cat > ._heading_').text(),
+        author: $('.consumption-content > .text > .name').text().trim(),
+        excerpt: $('.consumption_intro > h2').text(),
+        caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+    };
+});
+const fetchTimesNowNewsArticles = ({ URL, articleCount, declarative }) => __awaiter(void 0, void 0, void 0, function* () {
+    const articles = [];
+    const result = yield axios_1.default.get(URL);
+    const $ = cheerio_1.default.load(result.data);
+    $('.search-box > a').each((i, element) => {
+        var _a, _b;
+        if (i < articleCount) {
+            const title = (_a = $(element).find('.text').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`)) !== null && _a !== void 0 ? _a : '';
+            const articleLink = (_b = $(element).attr('href')) !== null && _b !== void 0 ? _b : '';
+            const articleID = articleLink ? kirak32_1.default(articleLink) : '0';
+            articles.push({
+                headerImageURL: '',
+                title,
+                category: '',
+                articleLink,
+                articleID,
+                author: '',
+                excerpt: '',
+                source: sources_1.TIMESNOWNEWS,
+                caption: ''
+            });
+        }
+    });
+    declarative && console.log('✅ Fetched Times Now News\' articles.');
+    articles.reverse();
+    let newPosts = false;
+    try {
+        const lastArticleID = fs_1.default.readFileSync('./timesnownews.mohini', { encoding: 'utf-8' }).toString();
+        const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+        if (lastArticleID === articles[articles.length - 1].articleID) {
+            newPosts = false;
+        }
+        else if (lastArticleIDIndex !== -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./timesnownews.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+            articles.splice(0, lastArticleIDIndex + 1);
+        }
+        else if (lastArticleIDIndex === -1) {
+            newPosts = true;
+            fs_1.default.writeFileSync('./timesnownews.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+    }
+    catch (e) {
+        newPosts = true;
+        if (e.code === 'ENOENT') {
+            fs_1.default.writeFileSync('./timesnownews.mohini', articles[articles.length - 1].articleID, { encoding: 'utf-8' });
+        }
+        else {
+            console.error(e);
+        }
+    }
+    if (newPosts) {
+        declarative && console.log('🔥 New articles to post from Times Now News!');
+        const articleBlobs = yield Promise.all(articles.map((article) => __awaiter(void 0, void 0, void 0, function* () { return yield fetchTimesNowNewsArticle(article.articleLink); }))), articleHashtags = articleBlobs.map(articleBlob => getHashtags(articleBlob.caption));
+        articles.forEach((article, i, array) => array[i] = Object.assign(Object.assign({}, article), { headerImageURL: articleBlobs[i].headerImageURL, category: articleBlobs[i].category, author: articleBlobs[i].author, excerpt: articleBlobs[i].excerpt, caption: `${lodash_1.default.truncate(articleBlobs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n').replace(/&nbsp;/g, ' ')}\n⠀\n${articleHashtags[i]}\n⠀\nSource: Times Now News` }));
+        return articles;
+    }
+    else {
+        declarative && console.log('🥶 No new articles to postfrom Times Now News!');
+        return [];
+    }
+});
 const createPost = (headerImageURL, title, excerpt, index) => __awaiter(void 0, void 0, void 0, function* () {
     const image = new jimp_1.default(1000, 1000, '#FFFFFF');
     const headerImage = (yield jimp_1.default.read(headerImageURL)).cover(1000, 500);
@@ -534,10 +615,9 @@ const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, 
     image.write(`./assets/output/story/${index}.jpg`);
 });
 const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, function* () {
-    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 4, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative });
-    const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
+    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 3, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative }), timesNowNewsArticles = yield fetchTimesNowNewsArticles({ URL: links_1.TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true });
+    const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles).concat(timesNowNewsArticles));
     if (articles.length === 0) {
-        declarative && console.log('🥶 No new articles to post!');
         return;
     }
     for (const [i, article] of articles.entries()) {
@@ -590,15 +670,18 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
         else {
             declarative && console.log('✅ Caption added!');
         }
-        declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
-        yield sleep(Math.round(Math.random() * 30000) + 30000);
-        declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
-        yield createStory(article.headerImageURL, article.title.trim(), i);
-        yield sleep(Math.round(Math.random() * 4000) + 1000);
-        yield ig.publish.story({
-            file: fs_1.default.readFileSync(`./assets/output/story/${i}.jpg`)
-        });
-        declarative && console.log('✅ Posted!');
+        // Stories have a 33% chances of being posted.
+        if (Math.round(Math.random() * 2) === 0) {
+            declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
+            yield sleep(Math.round(Math.random() * 30000) + 30000);
+            declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
+            yield createStory(article.headerImageURL, article.title.trim(), i);
+            yield sleep(Math.round(Math.random() * 4000) + 1000);
+            yield ig.publish.story({
+                file: fs_1.default.readFileSync(`./assets/output/story/${i}.jpg`)
+            });
+            declarative && console.log('✅ Posted!');
+        }
         declarative && console.log('⌚ Waiting 2 to 5 minutes to avoid ban...');
         yield sleep(Math.round(Math.random() * 3 * MINUTE) + 2 * MINUTE);
     }
@@ -625,7 +708,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     }), 45 * MINUTE);
     // Follow new users (5 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Following 50 users...');
+        declarative && console.log('🌺 Following 25 users...');
         const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
         while (targetIndexes.length < 5) {
             const r = Math.floor(Math.random() * followCount);
@@ -652,14 +735,14 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                 continue;
             }
         }
-        declarative && console.log('✅ 50 users followed!');
-    }), 3.3 * HOUR);
+        declarative && console.log('✅ 25 users followed!');
+    }), 2.3 * HOUR);
     // Unfollow users.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Unfollowing 50 users...');
+        declarative && console.log('🌺 Unfollowing 25 users...');
         const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
         for (const [i, user] of notFollowingYou.entries()) {
-            if (i <= 49) {
+            if (i <= 24) {
                 yield ig.friendship.destroy(user.pk);
                 const time = Math.round(Math.random() * 9000) + 1000;
                 yield sleep(time);
@@ -668,8 +751,8 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                 break;
             }
         }
-        declarative && console.log('✅ 50 users unfollowed!');
-    }), 4 * HOUR);
+        declarative && console.log('✅ 25 users unfollowed!');
+    }), 3 * HOUR);
     // Cannibalize stories >6 hours.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Deleting old stories...');
@@ -708,6 +791,12 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
             yield ig.publish.photo({
                 file: fs_1.default.readFileSync(`./assets/advert/3.jpg`),
                 caption: `Stand with us while we hold power accountable and keep democracy alive in West Taiwan and in the West Indian Province of Pakistan.`
+            });
+        }
+        else if (hour === 20) {
+            yield ig.publish.photo({
+                file: fs_1.default.readFileSync(`./assets/advert/4.jpg`),
+                caption: `Please support us by sharing our posts! #AatmaNirbharBharat`
             });
         }
     }), 1 * HOUR);

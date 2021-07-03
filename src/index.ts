@@ -27,9 +27,9 @@ interface IArticle {
 
 
 // Constants:
-import { OPINDIA_FEED, SWARAJYA_FEED, THEWIRE_EDITORS_PICK } from './constants/links';
+import { OPINDIA_FEED, SWARAJYA_FEED, THEWIRE_EDITORS_PICK, TIMES_NOW_NEWS_FEED } from './constants/links';
 import { IG_PASSWORD, IG_USERNAME } from './constants/credentials';
-import { OPINDIA, SWARAJYA, THEWIRE } from './constants/sources';
+import { OPINDIA, SWARAJYA, THEWIRE, TIMESNOWNEWS } from './constants/sources';
 const MINUTE = 60 * 1000, HOUR = 60 * MINUTE;
 
 
@@ -327,6 +327,91 @@ const fetchSwarajyaArticles = async ({ URL, articleCount, declarative }: { URL: 
   }
 };
 
+const fetchTimesNowNewsArticle = async (URL: string) => {
+  const result = await axios.get(URL);
+  const $ = cheerio.load(result.data);
+  let article = '';
+  $('.artical-description > p').each((_i, element) => {
+    const paragraph = $(element).text();
+    if (paragraph !== null) {
+      article = article.concat(`\n${ striptags(paragraph) }`);
+    }
+  });
+  return {
+    headerImageURL: ($('.artical-description').find('.img-pod > img').attr('data-src') ?? '').replace(/tr=w-[0-9]+,h-[0-9]+/g, 'tr=w-1000,h-500'),
+    category: $('._consumption_cat > ._heading_').text(),
+    author: $('.consumption-content > .text > .name').text().trim(),
+    excerpt: $('.consumption_intro > h2').text(),
+    caption: article.substring(1).replace(/‘|’/g, '\'').replace(/“|”/g, `"`)
+  };
+};
+
+const fetchTimesNowNewsArticles = async ({ URL, articleCount, declarative }: { URL: string, articleCount: number, declarative: boolean }) => {
+  const articles: IArticle[] = [];
+  const result = await axios.get(URL);
+  const $ = cheerio.load(result.data);
+  $('.search-box > a').each((i, element) => {
+    if (i < articleCount) {
+      const title = $(element).find('.text').text().replace(/‘|’/g, '\'').replace(/“|”/g, `"`) ?? '';
+      const articleLink = $(element).attr('href') ?? '';
+      const articleID = articleLink ? kirak32(articleLink) : '0';
+      articles.push({
+        headerImageURL: '',
+        title,
+        category: '',
+        articleLink,
+        articleID,
+        author: '',
+        excerpt: '',
+        source: TIMESNOWNEWS,
+        caption: ''
+      });
+    }
+  });
+  declarative && console.log('✅ Fetched Times Now News\' articles.');
+  articles.reverse();
+  let newPosts = false;
+  try {
+    const lastArticleID = fs.readFileSync('./timesnownews.mohini', { encoding: 'utf-8' }).toString();
+    const lastArticleIDIndex = articles.findIndex(article => article.articleID === lastArticleID);
+    if (lastArticleID === articles[ articles.length - 1 ].articleID) {
+      newPosts = false;
+    } else if (lastArticleIDIndex !== -1) {
+      newPosts = true;
+      fs.writeFileSync('./timesnownews.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+      articles.splice(0, lastArticleIDIndex + 1);
+    } else if (lastArticleIDIndex === -1) {
+      newPosts = true;
+      fs.writeFileSync('./timesnownews.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    }
+  } catch(e) {
+    newPosts = true;
+    if (e.code === 'ENOENT') {
+      fs.writeFileSync('./timesnownews.mohini', articles[ articles.length - 1 ].articleID, { encoding: 'utf-8' });
+    } else {
+      console.error(e);
+    }
+  }
+  if (newPosts) {
+    declarative && console.log('🔥 New articles to post from Times Now News!');
+    const
+      articleBlobs = await Promise.all(articles.map(async (article) => await fetchTimesNowNewsArticle(article.articleLink))),
+      articleHashtags = articleBlobs.map(articleBlob => getHashtags(articleBlob.caption));
+      articles.forEach((article, i, array) => array[i] = {
+        ...article,
+        headerImageURL: articleBlobs[i].headerImageURL,
+        category: articleBlobs[i].category,
+        author: articleBlobs[i].author,
+        excerpt: articleBlobs[i].excerpt,
+        caption: `${ _.truncate(articleBlobs[i].caption, { length: 1900 - articleHashtags[i].length }).replace(/(?:\r\n|\r|\n)/g, '\n⠀\n').replace(/&nbsp;/g, ' ') }\n⠀\n${ articleHashtags[i] }\n⠀\nSource: Times Now News`
+      });
+    return articles;
+  } else {
+    declarative && console.log('🥶 No new articles to postfrom Times Now News!');
+    return [];
+  }
+};
+
 const createPost = async (headerImageURL: string, title: string, excerpt: string, index: number) => {
   const image = new Jimp(1000, 1000, '#FFFFFF');
   const headerImage = (await Jimp.read(headerImageURL)).cover(1000, 500);
@@ -560,12 +645,12 @@ const createStory = async (headerImageURL: string, title: string, index: number)
 
 const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
   const
-    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 4, declarative }),
+    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 3, declarative }),
     theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 3, declarative }),
-    swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 3, declarative });
-  const articles = knuthShuffle<IArticle>(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles));
+    swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 3, declarative }),
+    timesNowNewsArticles = await fetchTimesNowNewsArticles({ URL: TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true});
+  const articles = knuthShuffle<IArticle>(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles).concat(timesNowNewsArticles));
   if (articles.length === 0) {
-    declarative && console.log('🥶 No new articles to post!');
     return;
   }
   for (const [ i, article ] of articles.entries()) {
@@ -614,15 +699,18 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     } else {
       declarative && console.log('✅ Caption added!');
     }
-    declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
-    await sleep(Math.round(Math.random() * 30000) + 30000);
-    declarative && console.log(`🌺 Posting ${ article.articleID } as a story...`);
-    await createStory(article.headerImageURL, article.title.trim(), i);
-    await sleep(Math.round(Math.random() * 4000) + 1000);
-    await ig.publish.story({
-      file: fs.readFileSync(`./assets/output/story/${ i }.jpg`)
-    });
-    declarative && console.log('✅ Posted!');
+    // Stories have a 33% chances of being posted.
+    if (Math.round(Math.random() * 2) === 0) {
+      declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
+      await sleep(Math.round(Math.random() * 30000) + 30000);
+      declarative && console.log(`🌺 Posting ${ article.articleID } as a story...`);
+      await createStory(article.headerImageURL, article.title.trim(), i);
+      await sleep(Math.round(Math.random() * 4000) + 1000);
+      await ig.publish.story({
+        file: fs.readFileSync(`./assets/output/story/${ i }.jpg`)
+      });
+      declarative && console.log('✅ Posted!');
+    }
     declarative && console.log('⌚ Waiting 2 to 5 minutes to avoid ban...');
     await sleep(Math.round(Math.random() * 3 * MINUTE) + 2 * MINUTE);
   }
@@ -653,7 +741,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
 
   // Follow new users (5 of n).
   setInterval(async () => {
-    declarative && console.log('🌺 Following 50 users...');
+    declarative && console.log('🌺 Following 25 users...');
     const
       followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId),
       followers = await getAllItemsFromFeed(followersFeed),
@@ -684,12 +772,12 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         continue;
       }
     }
-    declarative && console.log('✅ 50 users followed!');
-  }, 3.3 * HOUR);
+    declarative && console.log('✅ 25 users followed!');
+  }, 2.3 * HOUR);
 
   // Unfollow users.
   setInterval(async () => {
-    declarative && console.log('🌺 Unfollowing 50 users...');
+    declarative && console.log('🌺 Unfollowing 25 users...');
     const
       followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId),
       followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId),
@@ -698,7 +786,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
       followersUsername = new Set(followers.map(({ username }) => username)),
       notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
     for (const [ i, user ] of notFollowingYou.entries()) {
-      if (i <= 49) {
+      if (i <= 24) {
         await ig.friendship.destroy(user.pk);
         const time = Math.round(Math.random() * 9000) + 1000;
         await sleep(time);
@@ -706,8 +794,8 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         break;
       }
     }
-    declarative && console.log('✅ 50 users unfollowed!');
-  }, 4 * HOUR);
+    declarative && console.log('✅ 25 users unfollowed!');
+  }, 3 * HOUR);
 
   // Cannibalize stories >6 hours.
   setInterval(async () => {
@@ -747,6 +835,11 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
       await ig.publish.photo({
         file: fs.readFileSync(`./assets/advert/3.jpg`),
         caption: `Stand with us while we hold power accountable and keep democracy alive in West Taiwan and in the West Indian Province of Pakistan.`
+      });
+    } else if (hour === 20) {
+      await ig.publish.photo({
+        file: fs.readFileSync(`./assets/advert/4.jpg`),
+        caption: `Please support us by sharing our posts! #AatmaNirbharBharat`
       });
     }
   }, 1 * HOUR);
