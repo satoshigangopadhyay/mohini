@@ -7,7 +7,7 @@ import srcset from 'srcset';
 import kirak32 from './tools/kirak32';
 import Jimp from 'jimp';
 import fs from 'fs';
-import { Feed, IgApiClient } from 'instagram-private-api';
+import { Feed, IgApiClient, MediaConfigureTimelineOptions } from 'instagram-private-api';
 import _ from 'lodash';
 
 
@@ -579,13 +579,36 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     declarative && console.log(`🌺 Posting ${ article.articleID } as a photo...`);
     await createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
     await sleep(Math.round(Math.random() * 4000) + 1000);
-    await ig.publish.photo({
+    const uploadId = Date.now().toString();
+    await ig.upload.photo({
       file: fs.readFileSync(`./assets/output/posts/${ i }.jpg`),
-      caption: article.caption
+      uploadId
     });
     declarative && console.log('✅ Posted!');
-    declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
-    await sleep(Math.round(Math.random() * 15000) + 15000);
+    declarative && console.log('🌺 Adding caption...');
+    const configureOptions: MediaConfigureTimelineOptions = {
+      upload_id: uploadId,
+      width: 1000,
+      height: 1000,
+      caption: article.caption
+    };
+    await ig.media.checkOffensiveComment(article.caption);
+    const configureResult = await ig.media.configure(configureOptions);
+    if (configureResult.media.caption === null) {
+      declarative && console.log(`⌚ Caption could not be added to ${ article.articleID }! Waiting 5 minutes..`);
+      const captionFillInterval = setInterval(async () => {
+        if ((await ig.media.configure(configureOptions)).media.caption !== null) {
+          declarative && console.log(`✅ Caption added to ${ article.articleID }!`);
+          clearInterval(captionFillInterval);
+        } else {
+          declarative && console.log(`⌚ Caption could not be added to ${ article.articleID }! Waiting 5 minutes..`);
+        }
+      }, 5 * MINUTE);
+    } else {
+      declarative && console.log('✅ Caption added!');
+    }
+    declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
+    await sleep(Math.round(Math.random() * 30000) + 30000);
     declarative && console.log(`🌺 Posting ${ article.articleID } as a story...`);
     await createStory(article.headerImageURL, article.title.trim(), i);
     await sleep(Math.round(Math.random() * 4000) + 1000);

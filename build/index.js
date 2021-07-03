@@ -552,13 +552,38 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
         declarative && console.log(`🌺 Posting ${article.articleID} as a photo...`);
         yield createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
         yield sleep(Math.round(Math.random() * 4000) + 1000);
-        yield ig.publish.photo({
+        const uploadId = Date.now().toString();
+        yield ig.upload.photo({
             file: fs_1.default.readFileSync(`./assets/output/posts/${i}.jpg`),
-            caption: article.caption
+            uploadId
         });
         declarative && console.log('✅ Posted!');
-        declarative && console.log('⌚ Waiting 15 to 30 seconds to avoid ban...');
-        yield sleep(Math.round(Math.random() * 15000) + 15000);
+        declarative && console.log('🌺 Adding caption...');
+        const configureOptions = {
+            upload_id: uploadId,
+            width: 1000,
+            height: 1000,
+            caption: article.caption
+        };
+        yield ig.media.checkOffensiveComment(article.caption);
+        const configureResult = yield ig.media.configure(configureOptions);
+        if (configureResult.media.caption === null) {
+            declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 5 minutes..`);
+            const captionFillInterval = setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+                if ((yield ig.media.configure(configureOptions)).media.caption !== null) {
+                    declarative && console.log(`✅ Caption added to ${article.articleID}!`);
+                    clearInterval(captionFillInterval);
+                }
+                else {
+                    declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 5 minutes..`);
+                }
+            }), 5 * MINUTE);
+        }
+        else {
+            declarative && console.log('✅ Caption added!');
+        }
+        declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
+        yield sleep(Math.round(Math.random() * 30000) + 30000);
         declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
         yield createStory(article.headerImageURL, article.title.trim(), i);
         yield sleep(Math.round(Math.random() * 4000) + 1000);
