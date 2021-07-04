@@ -615,7 +615,7 @@ const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, 
     image.write(`./assets/output/story/${index}.jpg`);
 });
 const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, function* () {
-    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 3, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative }), timesNowNewsArticles = yield fetchTimesNowNewsArticles({ URL: links_1.TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true });
+    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 4, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative }), timesNowNewsArticles = (Math.round(Math.random() * 2) === 0) ? yield fetchTimesNowNewsArticles({ URL: links_1.TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true }) : [];
     const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles).concat(timesNowNewsArticles));
     if (articles.length === 0) {
         return;
@@ -670,8 +670,8 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
         else {
             declarative && console.log('✅ Caption added!');
         }
-        // Stories have a 33% chances of being posted.
-        if (Math.round(Math.random() * 2) === 0) {
+        // Stories have a 50% chances of being posted.
+        if (Math.round(Math.random()) === 0) {
             declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
             yield sleep(Math.round(Math.random() * 30000) + 30000);
             declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
@@ -706,11 +706,11 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         yield checkAndPublish(ig, declarative);
         declarative && console.log('⌚ Checking in after 45 minutes!');
     }), 45 * MINUTE);
-    // Follow new users (5 of n).
+    // Follow new users (8 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Following 25 users...');
+        declarative && console.log('🌺 Following 24 users...');
         const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
-        while (targetIndexes.length < 5) {
+        while (targetIndexes.length < 3) {
             const r = Math.floor(Math.random() * followCount);
             if (targetIndexes.indexOf(r) === -1)
                 targetIndexes.push(r);
@@ -718,7 +718,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         for (const targetIndex of targetIndexes) {
             const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
             if (followerFollowers.length > 0) {
-                while (subTargetIndexes.length < 5) {
+                while (subTargetIndexes.length < 8) {
                     const r = Math.floor(Math.random() * followerFollowers.length);
                     if (subTargetIndexes.indexOf(r) === -1)
                         subTargetIndexes.push(r);
@@ -735,8 +735,8 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                 continue;
             }
         }
-        declarative && console.log('✅ 25 users followed!');
-    }), 2.3 * HOUR);
+        declarative && console.log('✅ 24 users followed!');
+    }), 5.9 * HOUR);
     // Unfollow users.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Unfollowing 25 users...');
@@ -752,7 +752,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
             }
         }
         declarative && console.log('✅ 25 users unfollowed!');
-    }), 3 * HOUR);
+    }), 6.1 * HOUR);
     // Cannibalize stories >6 hours.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Deleting old stories...');

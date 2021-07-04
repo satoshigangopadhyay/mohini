@@ -645,10 +645,10 @@ const createStory = async (headerImageURL: string, title: string, index: number)
 
 const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
   const
-    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 3, declarative }),
+    opIndiaArticles = await fetchOpIndiaArticles({ URL: OPINDIA_FEED, articleCount: 4, declarative }),
     theWireArticles = await fetchTheWireArticles({ URL: THEWIRE_EDITORS_PICK, articleCount: 3, declarative }),
     swarajyaArticles = await fetchSwarajyaArticles({ URL: SWARAJYA_FEED, articleCount: 3, declarative }),
-    timesNowNewsArticles = await fetchTimesNowNewsArticles({ URL: TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true});
+    timesNowNewsArticles = (Math.round(Math.random() * 2) === 0) ? await fetchTimesNowNewsArticles({ URL: TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true}) : [];
   const articles = knuthShuffle<IArticle>(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles).concat(timesNowNewsArticles));
   if (articles.length === 0) {
     return;
@@ -699,8 +699,8 @@ const checkAndPublish = async (ig: IgApiClient, declarative: boolean) => {
     } else {
       declarative && console.log('✅ Caption added!');
     }
-    // Stories have a 33% chances of being posted.
-    if (Math.round(Math.random() * 2) === 0) {
+    // Stories have a 50% chances of being posted.
+    if (Math.round(Math.random()) === 0) {
       declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
       await sleep(Math.round(Math.random() * 30000) + 30000);
       declarative && console.log(`🌺 Posting ${ article.articleID } as a story...`);
@@ -739,15 +739,15 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
     declarative && console.log('⌚ Checking in after 45 minutes!');
   }, 45 * MINUTE);
 
-  // Follow new users (5 of n).
+  // Follow new users (8 of n).
   setInterval(async () => {
-    declarative && console.log('🌺 Following 25 users...');
+    declarative && console.log('🌺 Following 24 users...');
     const
       followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId),
       followers = await getAllItemsFromFeed(followersFeed),
       followCount = followers.length,
       targetIndexes = [];
-    while (targetIndexes.length < 5) {
+    while (targetIndexes.length < 3) {
       const r = Math.floor(Math.random() * followCount);
       if (targetIndexes.indexOf(r) === -1) targetIndexes.push(r);
     }
@@ -757,7 +757,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         followerFollowers = await followerFollowersFeed.items(),
         subTargetIndexes = [];
       if (followerFollowers.length > 0) {
-        while (subTargetIndexes.length < 5) {
+        while (subTargetIndexes.length < 8) {
           const r = Math.floor(Math.random() * followerFollowers.length);
           if (subTargetIndexes.indexOf(r) === -1) subTargetIndexes.push(r);
         }
@@ -772,8 +772,8 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
         continue;
       }
     }
-    declarative && console.log('✅ 25 users followed!');
-  }, 2.3 * HOUR);
+    declarative && console.log('✅ 24 users followed!');
+  }, 5.9 * HOUR);
 
   // Unfollow users.
   setInterval(async () => {
@@ -795,7 +795,7 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
       }
     }
     declarative && console.log('✅ 25 users unfollowed!');
-  }, 3 * HOUR);
+  }, 6.1 * HOUR);
 
   // Cannibalize stories >6 hours.
   setInterval(async () => {
