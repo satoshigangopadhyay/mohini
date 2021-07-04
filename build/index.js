@@ -708,50 +708,64 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     }), 45 * MINUTE);
     // Follow new users (8 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Following 24 users...');
-        const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
-        while (targetIndexes.length < 3) {
-            const r = Math.floor(Math.random() * followCount);
-            if (targetIndexes.indexOf(r) === -1)
-                targetIndexes.push(r);
-        }
-        for (const targetIndex of targetIndexes) {
-            const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
-            if (followerFollowers.length > 0) {
-                while (subTargetIndexes.length < 8) {
-                    const r = Math.floor(Math.random() * followerFollowers.length);
-                    if (subTargetIndexes.indexOf(r) === -1)
-                        subTargetIndexes.push(r);
-                }
-                for (const subTargetIndex of subTargetIndexes) {
-                    ig.friendship.create(followerFollowers[subTargetIndex].pk);
-                    const time = Math.round(Math.random() * 1000) + 1000;
+        let counter = 0;
+        try {
+            declarative && console.log('🌺 Following 24 users...');
+            const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
+            while (targetIndexes.length < 3) {
+                const r = Math.floor(Math.random() * followCount);
+                if (targetIndexes.indexOf(r) === -1)
+                    targetIndexes.push(r);
+            }
+            for (const targetIndex of targetIndexes) {
+                const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
+                if (followerFollowers.length > 0) {
+                    while (subTargetIndexes.length < 8) {
+                        const r = Math.floor(Math.random() * followerFollowers.length);
+                        if (subTargetIndexes.indexOf(r) === -1)
+                            subTargetIndexes.push(r);
+                    }
+                    for (const subTargetIndex of subTargetIndexes) {
+                        ig.friendship.create(followerFollowers[subTargetIndex].pk);
+                        counter++;
+                        const time = Math.round(Math.random() * 1000) + 1000;
+                        yield sleep(time);
+                    }
+                    const time = Math.round(Math.random() * 9000) + 1000;
                     yield sleep(time);
                 }
-                const time = Math.round(Math.random() * 9000) + 1000;
-                yield sleep(time);
+                else {
+                    continue;
+                }
             }
-            else {
-                continue;
-            }
+            declarative && console.log('✅ 24 users followed!');
         }
-        declarative && console.log('✅ 24 users followed!');
+        catch (e) {
+            declarative && console.error(`🍁 Encountered spam error, ${counter}/25 users followed.`);
+        }
     }), 5.9 * HOUR);
     // Unfollow users.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Unfollowing 25 users...');
-        const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
-        for (const [i, user] of notFollowingYou.entries()) {
-            if (i <= 24) {
-                yield ig.friendship.destroy(user.pk);
-                const time = Math.round(Math.random() * 9000) + 1000;
-                yield sleep(time);
+        let counter = 0;
+        try {
+            declarative && console.log('🌺 Unfollowing 25 users...');
+            const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
+            for (const [i, user] of notFollowingYou.entries()) {
+                if (i <= 24) {
+                    yield ig.friendship.destroy(user.pk);
+                    counter++;
+                    const time = Math.round(Math.random() * 9000) + 1000;
+                    yield sleep(time);
+                }
+                else {
+                    break;
+                }
             }
-            else {
-                break;
-            }
+            declarative && console.log('✅ 25 users unfollowed!');
         }
-        declarative && console.log('✅ 25 users unfollowed!');
+        catch (e) {
+            declarative && console.error(`🍁 Encountered spam error, ${counter}/25 users unfollowed.`);
+        }
     }), 6.1 * HOUR);
     // Cannibalize stories >6 hours.
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
