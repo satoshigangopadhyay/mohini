@@ -726,7 +726,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                             subTargetIndexes.push(r);
                     }
                     for (const subTargetIndex of subTargetIndexes) {
-                        ig.friendship.create(followerFollowers[subTargetIndex].pk);
+                        yield ig.friendship.create(followerFollowers[subTargetIndex].pk);
                         counter++;
                         const time = Math.round(Math.random() * 1000) + 1000;
                         yield sleep(time);
