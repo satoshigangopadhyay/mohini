@@ -731,13 +731,13 @@ const engine = async ({ declarative }: { declarative: boolean }) => {
   // First run.
   declarative && console.log('🌺 Checking for new articles...');
   await checkAndPublish(ig, declarative);
-  declarative && console.log('⌚ Checking in after 45 minutes!');
+  declarative && console.log('⌚ Checking in after 1 hour!');
 
   setInterval(async () => {
     declarative && console.log('🌺 Checking for new articles...');
     await checkAndPublish(ig, declarative);
-    declarative && console.log('⌚ Checking in after 45 minutes!');
-  }, 45 * MINUTE);
+    declarative && console.log('⌚ Checking in after 1 hour!');
+  }, 1 * HOUR);
 
   // Follow new users (8 of n).
   setInterval(async () => {

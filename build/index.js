@@ -700,12 +700,12 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
     // First run.
     declarative && console.log('🌺 Checking for new articles...');
     yield checkAndPublish(ig, declarative);
-    declarative && console.log('⌚ Checking in after 45 minutes!');
+    declarative && console.log('⌚ Checking in after 1 hour!');
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         declarative && console.log('🌺 Checking for new articles...');
         yield checkAndPublish(ig, declarative);
-        declarative && console.log('⌚ Checking in after 45 minutes!');
-    }), 45 * MINUTE);
+        declarative && console.log('⌚ Checking in after 1 hour!');
+    }), 1 * HOUR);
     // Follow new users (8 of n).
     setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
         let counter = 0;
