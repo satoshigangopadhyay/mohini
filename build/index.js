@@ -22,6 +22,7 @@ const kirak32_1 = __importDefault(require("./tools/kirak32"));
 const jimp_1 = __importDefault(require("jimp"));
 const fs_1 = __importDefault(require("fs"));
 const instagram_private_api_1 = require("instagram-private-api");
+const fixed_1 = require("set-interval-async/fixed");
 const lodash_1 = __importDefault(require("lodash"));
 ;
 // Constants:
@@ -615,7 +616,7 @@ const createStory = (headerImageURL, title, index) => __awaiter(void 0, void 0, 
     image.write(`./assets/output/story/${index}.jpg`);
 });
 const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, function* () {
-    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 4, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative }), timesNowNewsArticles = (Math.round(Math.random() * 2) === 0) ? yield fetchTimesNowNewsArticles({ URL: links_1.TIMES_NOW_NEWS_FEED, articleCount: 1, declarative: true }) : [];
+    const opIndiaArticles = yield fetchOpIndiaArticles({ URL: links_1.OPINDIA_FEED, articleCount: 4, declarative }), theWireArticles = yield fetchTheWireArticles({ URL: links_1.THEWIRE_EDITORS_PICK, articleCount: 3, declarative }), swarajyaArticles = yield fetchSwarajyaArticles({ URL: links_1.SWARAJYA_FEED, articleCount: 3, declarative }), timesNowNewsArticles = (Math.round(Math.random() * 2) === 0) ? yield fetchTimesNowNewsArticles({ URL: links_1.TIMES_NOW_NEWS_FEED, articleCount: 2, declarative: true }) : [];
     const articles = knuthShuffle(opIndiaArticles.concat(theWireArticles).concat(swarajyaArticles).concat(timesNowNewsArticles));
     if (articles.length === 0) {
         return;
@@ -637,7 +638,7 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
                 article.excerpt = excerpt;
             }
         }
-        declarative && console.log(`🌺 Posting ${article.articleID} as a photo...`);
+        declarative && console.log(`🌺 Posting ${article.articleID} as a photo..`);
         yield createPost(article.headerImageURL, article.title.trim(), article.excerpt.trim(), i);
         yield sleep(Math.round(Math.random() * 4000) + 1000);
         const uploadId = Date.now().toString();
@@ -646,7 +647,8 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
             uploadId
         });
         declarative && console.log('✅ Posted!');
-        declarative && console.log('🌺 Adding caption...');
+        yield sleep(Math.round(Math.random() * 4000) + 1000);
+        declarative && console.log('🌺 Adding caption..');
         const configureOptions = {
             upload_id: uploadId,
             width: 1000,
@@ -656,25 +658,27 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
         yield ig.media.checkOffensiveComment(article.caption);
         const configureResult = yield ig.media.configure(configureOptions);
         if (configureResult.media.caption === null) {
-            declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 5 minutes..`);
+            declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 3 + 1 hours..`);
+            declarative && console.log(`🍁 Caption spam detected. Delaying all operations for 3 hours..`);
+            yield sleep(3 * HOUR);
             const captionFillInterval = setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
                 if ((yield ig.media.configure(configureOptions)).media.caption !== null) {
                     declarative && console.log(`✅ Caption added to ${article.articleID}!`);
                     clearInterval(captionFillInterval);
                 }
                 else {
-                    declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 5 minutes..`);
+                    declarative && console.log(`⌚ Caption could not be added to ${article.articleID}! Waiting 1 hour..`);
                 }
-            }), 5 * MINUTE);
+            }), 1 * HOUR);
         }
         else {
             declarative && console.log('✅ Caption added!');
         }
         // Stories have a 50% chances of being posted.
         if (Math.round(Math.random()) === 0) {
-            declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban...');
+            declarative && console.log('⌚ Waiting 30 seconds to 1 minute to avoid ban..');
             yield sleep(Math.round(Math.random() * 30000) + 30000);
-            declarative && console.log(`🌺 Posting ${article.articleID} as a story...`);
+            declarative && console.log(`🌺 Posting ${article.articleID} as a story..`);
             yield createStory(article.headerImageURL, article.title.trim(), i);
             yield sleep(Math.round(Math.random() * 4000) + 1000);
             yield ig.publish.story({
@@ -682,35 +686,32 @@ const checkAndPublish = (ig, declarative) => __awaiter(void 0, void 0, void 0, f
             });
             declarative && console.log('✅ Posted!');
         }
-        declarative && console.log('⌚ Waiting 2 to 5 minutes to avoid ban...');
-        yield sleep(Math.round(Math.random() * 3 * MINUTE) + 2 * MINUTE);
+        declarative && console.log('⌚ Waiting 10 to 12 minutes to avoid ban..');
+        yield sleep(Math.round(Math.random() * 10 * MINUTE) + 2 * MINUTE);
     }
     declarative && console.log('✅ All articles were posted!');
 });
 const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* () {
-    declarative && console.log('🌺 Initializing Mohini...');
+    declarative && console.log('🌺 Initializing Mohini..');
     const ig = new instagram_private_api_1.IgApiClient();
     ig.state.generateDevice(credentials_1.IG_USERNAME);
     declarative && console.log('✅ Generated new device.');
-    declarative && console.log('🌺 Logging in...');
+    declarative && console.log('🌺 Logging in..');
     yield ig.simulate.preLoginFlow();
     const loggedInUser = yield ig.account.login(credentials_1.IG_USERNAME, credentials_1.IG_PASSWORD);
     process.nextTick(() => __awaiter(void 0, void 0, void 0, function* () { return yield ig.simulate.postLoginFlow(); }));
     declarative && console.log('✅ Logged in to account.');
-    // First run.
-    declarative && console.log('🌺 Checking for new articles...');
-    yield checkAndPublish(ig, declarative);
-    declarative && console.log('⌚ Checking in after 1 hour!');
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Checking for new articles...');
+    // Post new articles.
+    fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
+        declarative && console.log('🌺 Checking for new articles..');
         yield checkAndPublish(ig, declarative);
         declarative && console.log('⌚ Checking in after 1 hour!');
     }), 1 * HOUR);
     // Follow new users (8 of n).
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+    fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
         let counter = 0;
         try {
-            declarative && console.log('🌺 Following 24 users...');
+            declarative && console.log('🌺 Following 24 users..');
             const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
             while (targetIndexes.length < 3) {
                 const r = Math.floor(Math.random() * followCount);
@@ -728,11 +729,11 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                     for (const subTargetIndex of subTargetIndexes) {
                         yield ig.friendship.create(followerFollowers[subTargetIndex].pk);
                         counter++;
-                        const time = Math.round(Math.random() * 1000) + 1000;
-                        yield sleep(time);
+                        // Wait 25 mins.
+                        yield sleep(25 * MINUTE);
                     }
-                    const time = Math.round(Math.random() * 9000) + 1000;
-                    yield sleep(time);
+                    // Wait 5 mins.
+                    yield sleep(5 * MINUTE);
                 }
                 else {
                     continue;
@@ -741,35 +742,37 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
             declarative && console.log('✅ 24 users followed!');
         }
         catch (e) {
-            declarative && console.error(`🍁 Encountered spam error, ${counter}/25 users followed.`);
+            declarative && console.error(`🍁 Encountered spam error, ${counter}/24 users followed.`);
         }
-    }), 5.9 * HOUR);
+    }), 12 * HOUR);
     // Unfollow users.
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        let counter = 0;
-        try {
-            declarative && console.log('🌺 Unfollowing 25 users...');
-            const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
-            for (const [i, user] of notFollowingYou.entries()) {
-                if (i <= 24) {
-                    yield ig.friendship.destroy(user.pk);
-                    counter++;
-                    const time = Math.round(Math.random() * 9000) + 1000;
-                    yield sleep(time);
+    setTimeout(() => {
+        fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
+            let counter = 0;
+            try {
+                declarative && console.log('🌺 Unfollowing 24 users..');
+                const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
+                for (const [i, user] of notFollowingYou.entries()) {
+                    if (i < 24) {
+                        yield ig.friendship.destroy(user.pk);
+                        counter++;
+                        // Wait 30 mins.
+                        yield sleep(30 * MINUTE);
+                    }
+                    else {
+                        break;
+                    }
                 }
-                else {
-                    break;
-                }
+                declarative && console.log('✅ 24 users unfollowed!');
             }
-            declarative && console.log('✅ 25 users unfollowed!');
-        }
-        catch (e) {
-            declarative && console.error(`🍁 Encountered spam error, ${counter}/25 users unfollowed.`);
-        }
-    }), 6.1 * HOUR);
+            catch (e) {
+                declarative && console.error(`🍁 Encountered spam error, ${counter}/24 users unfollowed.`);
+            }
+        }), 12 * HOUR);
+    }, 6 * HOUR);
     // Cannibalize stories >6 hours.
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
-        declarative && console.log('🌺 Deleting old stories...');
+    fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
+        declarative && console.log('🌺 Deleting old stories..');
         const storiesFeed = ig.feed.userStory(loggedInUser.pk), stories = yield getAllItemsFromFeed(storiesFeed);
         for (const story of stories) {
             if ((((Date.now() / 1000) - story.taken_at) / 60 / 60) > 6) {
@@ -781,7 +784,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         declarative && console.log('✅ Old stories deleted!');
     }), 2.5 * HOUR);
     // Post promotional material.
-    setInterval(() => __awaiter(void 0, void 0, void 0, function* () {
+    fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
         const date = new Date(), hour = date.getHours();
         if (hour === 12) {
             yield ig.publish.photo({
