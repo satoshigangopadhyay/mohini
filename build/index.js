@@ -707,13 +707,13 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         yield checkAndPublish(ig, declarative);
         declarative && console.log('⌚ Checking in after 1 hour!');
     }), 1 * HOUR);
-    // Follow new users (8 of n).
+    // Follow new users (10 of n).
     fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
         let counter = 0;
         try {
-            declarative && console.log('🌺 Following 24 users..');
+            declarative && console.log('🌺 Following 50 users..');
             const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), followCount = followers.length, targetIndexes = [];
-            while (targetIndexes.length < 3) {
+            while (targetIndexes.length < 5) {
                 const r = Math.floor(Math.random() * followCount);
                 if (targetIndexes.indexOf(r) === -1)
                     targetIndexes.push(r);
@@ -721,7 +721,7 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
             for (const targetIndex of targetIndexes) {
                 const followerFollowersFeed = ig.feed.accountFollowers(followers[targetIndex].pk), followerFollowers = yield followerFollowersFeed.items(), subTargetIndexes = [];
                 if (followerFollowers.length > 0) {
-                    while (subTargetIndexes.length < 8) {
+                    while (subTargetIndexes.length < 10) {
                         const r = Math.floor(Math.random() * followerFollowers.length);
                         if (subTargetIndexes.indexOf(r) === -1)
                             subTargetIndexes.push(r);
@@ -730,19 +730,19 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
                         yield ig.friendship.create(followerFollowers[subTargetIndex].pk);
                         counter++;
                         // Wait 25 mins.
-                        yield sleep(25 * MINUTE);
+                        yield sleep(10 * MINUTE);
                     }
                     // Wait 5 mins.
-                    yield sleep(5 * MINUTE);
+                    yield sleep(4 * MINUTE);
                 }
                 else {
                     continue;
                 }
             }
-            declarative && console.log('✅ 24 users followed!');
+            declarative && console.log('✅ 50 users followed!');
         }
         catch (e) {
-            declarative && console.error(`🍁 Encountered spam error, ${counter}/24 users followed.`);
+            declarative && console.error(`🍁 Encountered spam error, ${counter}/50 users followed.`);
         }
     }), 12 * HOUR);
     // Unfollow users.
@@ -750,23 +750,23 @@ const engine = ({ declarative }) => __awaiter(void 0, void 0, void 0, function* 
         fixed_1.setIntervalAsync(() => __awaiter(void 0, void 0, void 0, function* () {
             let counter = 0;
             try {
-                declarative && console.log('🌺 Unfollowing 24 users..');
+                declarative && console.log('🌺 Unfollowing 50 users..');
                 const followersFeed = ig.feed.accountFollowers(ig.state.cookieUserId), followingFeed = ig.feed.accountFollowing(ig.state.cookieUserId), followers = yield getAllItemsFromFeed(followersFeed), following = yield getAllItemsFromFeed(followingFeed), followersUsername = new Set(followers.map(({ username }) => username)), notFollowingYou = following.filter(({ username }) => !followersUsername.has(username));
                 for (const [i, user] of notFollowingYou.entries()) {
-                    if (i < 24) {
+                    if (i < 50) {
                         yield ig.friendship.destroy(user.pk);
                         counter++;
-                        // Wait 30 mins.
-                        yield sleep(30 * MINUTE);
+                        // Wait 14 mins.
+                        yield sleep(14 * MINUTE);
                     }
                     else {
                         break;
                     }
                 }
-                declarative && console.log('✅ 24 users unfollowed!');
+                declarative && console.log('✅ 50 users unfollowed!');
             }
             catch (e) {
-                declarative && console.error(`🍁 Encountered spam error, ${counter}/24 users unfollowed.`);
+                declarative && console.error(`🍁 Encountered spam error, ${counter}/50 users unfollowed.`);
             }
         }), 12 * HOUR);
     }, 6 * HOUR);
